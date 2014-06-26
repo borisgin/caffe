@@ -1,9 +1,9 @@
 #!/usr/bin/env sh
-# This scripts downloads the caffe reference imagenet model
-# for ilsvrc image classification and deep feature extraction
+# This scripts downloads the Caffe R-CNN ImageNet
+# for ILSVRC13 detection.
 
-MODEL=caffe_reference_imagenet_model
-CHECKSUM=af678f0bd3cdd2437e35679d88665170
+MODEL=caffe_rcnn_imagenet_model
+CHECKSUM=42c1556d2d47a9128c4a90e0a9c5341c
 
 if [ -f $MODEL ]; then
   echo "Model already exists. Checking md5..."
@@ -23,6 +23,5 @@ fi
 
 echo "Downloading..."
 
-wget --no-check-certificate https://www.dropbox.com/s/7qkokvr7x0esljl/$MODEL
-
+wget --no-check-certificate https://www.dropbox.com/s/0i3etlgmsmgf5ei/$MODEL
 echo "Done. Please run this command again to verify that checksum = $CHECKSUM."

@@ -2,8 +2,8 @@
 # This scripts downloads the caffe reference imagenet model
 # for ilsvrc image classification and deep feature extraction
 
-MODEL=caffe_reference_imagenet_model
-CHECKSUM=af678f0bd3cdd2437e35679d88665170
+MODEL=caffe_alexnet_model
+CHECKSUM=29eb495b11613825c1900382f5286963
 
 if [ -f $MODEL ]; then
   echo "Model already exists. Checking md5..."
@@ -23,6 +23,6 @@ fi
 
 echo "Downloading..."
 
-wget --no-check-certificate https://www.dropbox.com/s/7qkokvr7x0esljl/$MODEL
+wget --no-check-certificate https://www.dropbox.com/s/rk6nkt0kf109slo/caffe_alexnet_model
 
 echo "Done. Please run this command again to verify that checksum = $CHECKSUM."

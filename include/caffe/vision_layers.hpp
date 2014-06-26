@@ -6,6 +6,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <complex>
 
 #include "leveldb/db.h"
 #include "pthread.h"
@@ -16,6 +17,7 @@
 #include "caffe/common.hpp"
 #include "caffe/layer.hpp"
 #include "caffe/proto/caffe.pb.h"
+#include "caffe/util/fft.hpp"
 
 #define HDF5_DATA_DATASET_NAME "data"
 #define HDF5_DATA_LABEL_NAME "label"
@@ -229,9 +231,18 @@ template <typename Dtype>
 class ConvolutionLayer : public Layer<Dtype> {
  public:
   explicit ConvolutionLayer(const LayerParameter& param)
-      : Layer<Dtype>(param) {}
+      : Layer<Dtype>(param) { fft_on_ = false; fft_initialized_ = false; }
   virtual void SetUp(const vector<Blob<Dtype>*>& bottom,
       vector<Blob<Dtype>*>* top);
+  virtual  ~ConvolutionLayer<Dtype>();
+
+  virtual inline LayerParameter_LayerType type() const {
+    return LayerParameter_LayerType_CONVOLUTION;
+  }
+  virtual inline int ExactNumBottomBlobs() const { return 1; }
+  virtual inline int ExactNumTopBlobs() const { return 1; }
+  virtual void FFT_on() ;
+  virtual void FFT_off();
 
  protected:
   virtual Dtype Forward_cpu(const vector<Blob<Dtype>*>& bottom,
@@ -258,6 +269,44 @@ class ConvolutionLayer : public Layer<Dtype> {
   int M_;
   int K_;
   int N_;
+  // openmp
+  virtual void Forward_cpu_task(const Dtype *bottom_data, Dtype* top_data,
+      const Dtype* weight, int n);
+//  virtual void Backward_cpu_task(const Dtype* top_diff,
+//      const Dtype* bottom_data, Dtype* bottom_diff, const Dtype* weight,
+//      const bool propagate_down, int n);
+  int num_of_threads_;
+  std::vector<Dtype> col_buffer_mt_;
+  std::vector<Dtype> weight_diff_mt_;
+
+  // fft ------------------------------------------------------------
+  virtual Dtype Forward_cpu_fft(const vector<Blob<Dtype>*>& bottom,
+      vector<Blob<Dtype>*>* top);
+  virtual void Forward_cpu_fft_task(const Dtype *bottom_data, Dtype* top_data,
+      const Dtype* weight, int n);
+  virtual void fft_setup();
+  virtual void fft_clean();
+  virtual void fft_doFFT_weights();
+
+  bool fft_on_;
+  bool fft_initialized_;
+  int fft_height_;
+  int fft_width_;
+  int fft_map_real_size_;
+  int fft_map_complex_size_;
+  int height_out_;
+  int width_out_;
+  int map_out_size_;
+  // buffers
+  Dtype* fft_weights_real_;
+  Dtype* fft_map_in_real_;
+  std::complex<Dtype>* fft_weights_complex_;
+  std::complex<Dtype>* fft_map_in_complex_;
+  std::complex<Dtype>* fft_map_out_complex_;
+  Dtype* fft_map_out_real_;
+  void* fft_handle_;
+  void* ifft_handle_;
+  void* fft_many_handle_;
 };
 
 // This function is used to create a pthread that prefetches the data.
