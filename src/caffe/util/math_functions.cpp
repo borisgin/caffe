@@ -9,6 +9,8 @@
 
 namespace caffe {
 
+using std::complex;
+
 template<>
 void caffe_cpu_gemm<float>(const CBLAS_TRANSPOSE TransA,
     const CBLAS_TRANSPOSE TransB, const int M, const int N, const int K,
@@ -21,6 +23,17 @@ void caffe_cpu_gemm<float>(const CBLAS_TRANSPOSE TransA,
 }
 
 template<>
+void caffe_cpu_c_gemm<float>(const CBLAS_TRANSPOSE TransA,
+    const CBLAS_TRANSPOSE TransB, const int M, const int N, const int K,
+    const complex<float> alpha, const complex<float>* A, const int lda,
+    const complex<float>* B, const int ldb, const complex<float> beta,
+    complex<float>* C, const int ldc) {
+  cblas_cgemm(CblasRowMajor, TransA, TransB, M, N, K,
+              reinterpret_cast<void *>&alpha, A, lda,
+              B, ldb, reinterpret_cast<void *>&beta, C, ldc);
+}
+
+template<>
 void caffe_cpu_gemm<double>(const CBLAS_TRANSPOSE TransA,
     const CBLAS_TRANSPOSE TransB, const int M, const int N, const int K,
     const double alpha, const double* A, const double* B, const double beta,
@@ -29,6 +42,17 @@ void caffe_cpu_gemm<double>(const CBLAS_TRANSPOSE TransA,
   int ldb = (TransB == CblasNoTrans) ? N : K;
   cblas_dgemm(CblasRowMajor, TransA, TransB, M, N, K, alpha, A, lda, B,
       ldb, beta, C, N);
+}
+
+template<>
+void caffe_cpu_c_gemm<double>(const CBLAS_TRANSPOSE TransA,
+    const CBLAS_TRANSPOSE TransB, const int M, const int N, const int K,
+    const complex<double> alpha, const complex<double>* A,  const int lda,
+    const complex<double>* B, const int ldb, const complex<double> beta,
+    complex<double>* C, const int ldc) {
+  cblas_zgemm(CblasRowMajor, TransA, TransB, M, N, K,
+              reinterpret_cast<void *>&alpha, A, lda, B,
+              ldb, reinterpret_cast<void *>&beta, C, ldc);
 }
 
 template <>

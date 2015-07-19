@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <cmath>  // for std::fabs and std::signbit
+#include <complex>
 
 #include "glog/logging.h"
 
@@ -10,6 +11,7 @@
 #include "caffe/util/device_alternate.hpp"
 #include "caffe/util/mkl_alternate.hpp"
 
+using std::complex;
 namespace caffe {
 
 // Decaf gemm provides a simpler interface to the gemm functions, with the
@@ -19,6 +21,13 @@ void caffe_cpu_gemm(const CBLAS_TRANSPOSE TransA,
     const CBLAS_TRANSPOSE TransB, const int M, const int N, const int K,
     const Dtype alpha, const Dtype* A, const Dtype* B, const Dtype beta,
     Dtype* C);
+
+template <typename Dtype>
+void caffe_cpu_c_gemm(const CBLAS_TRANSPOSE TransA,
+    const CBLAS_TRANSPOSE TransB, const int M, const int N, const int K,
+    const complex<Dtype> alpha, const complex<Dtype>* A, const int lda,
+    const complex<Dtype>* B, const int ldb, const complex<Dtype> beta,
+    complex<Dtype>* C, const int ldc);
 
 template <typename Dtype>
 void caffe_cpu_gemv(const CBLAS_TRANSPOSE TransA, const int M, const int N,
@@ -157,6 +166,20 @@ template <typename Dtype>
 void caffe_gpu_gemv(const CBLAS_TRANSPOSE TransA, const int M, const int N,
     const Dtype alpha, const Dtype* A, const Dtype* x, const Dtype beta,
     Dtype* y);
+
+template <typename Dtype>
+void caffe_gpu_c_geam(const CBLAS_TRANSPOSE TransA,
+    const CBLAS_TRANSPOSE TransB, const int N, const int M,
+    const complex<Dtype>* alpha, const complex<Dtype>* A,
+    const complex<Dtype>* beta, const complex<Dtype>* B,
+    complex<Dtype>* C);
+
+template <typename Dtype>
+void caffe_gpu_c_gemm(const CBLAS_TRANSPOSE TransA,
+    const CBLAS_TRANSPOSE TransB, const int M, const int N, const int K,
+    const complex<Dtype> alpha, const complex<Dtype>* A, const int lda,
+    const complex<Dtype>* B, const int ldb, const complex<Dtype> beta,
+    complex<Dtype>* C, const int ldc);
 
 template <typename Dtype>
 void caffe_gpu_axpy(const int N, const Dtype alpha, const Dtype* X,

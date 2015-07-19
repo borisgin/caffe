@@ -14,6 +14,7 @@
 #include "caffe/util/math_functions.hpp"
 #include "caffe/vision_layers.hpp"
 
+#define HASH_SIZE 1024 * 1024
 
 namespace caffe {
 
@@ -199,32 +200,50 @@ void ConvolutionLayerFFT<Dtype>::fft_setup() {
       break;
   }
 }
+
 template <typename Dtype>
 void ConvolutionLayerFFT<Dtype>::fft_cpu_setup() {
   if (fft_cpu_initialized_)
     fft_cpu_clean();
 
   // allocate buffers for fft
-  int num_weights = num_output_ * (channels_ / group_);
+  num_weights = num_output_ * (channels_ / group_);
 
-  fft_weights_complex_ = (std::complex<Dtype> *)  caffe_cpu_fft_malloc<Dtype>(
-        num_weights * fft_map_complex_size_ * sizeof(std::complex<Dtype> ));
+  fft_weights_complex_ = (std::complex<Dtype> *) caffe_cpu_fft_malloc<Dtype>(
+      num_weights * fft_map_complex_size_ * sizeof(std::complex<Dtype> ));
+  fft_weights_complex_2 = (std::complex<Dtype> *) caffe_cpu_fft_malloc<Dtype>(
+      num_weights * fft_map_complex_size_ * sizeof(std::complex<Dtype> ));
+
   fft_map_in_real_ = reinterpret_cast<Dtype *> (caffe_cpu_fft_malloc<Dtype>(
-        num_of_threads_ * fft_map_real_size_ * sizeof(Dtype)));
+          num_of_threads_ * fft_map_real_size_ * sizeof(Dtype)));
   fft_map_in_complex_ = (std::complex<Dtype> *) caffe_cpu_fft_malloc<Dtype>(
-        num_of_threads_ * fft_map_complex_size_ * sizeof(std::complex<Dtype>));
+      num_of_threads_ * fft_map_complex_size_ * sizeof(std::complex<Dtype>));
   fft_map_out_complex_ = (std::complex<Dtype>*) caffe_cpu_fft_malloc<Dtype>(
-        num_of_threads_ * std::max(num_output_, channels_) *
-        fft_map_complex_size_ * sizeof(std::complex<Dtype>));
+      num_of_threads_ * std::max(num_output_, channels_) *
+      fft_map_complex_size_ * sizeof(std::complex<Dtype>));
   fft_map_out_real_ = reinterpret_cast<Dtype *> (caffe_cpu_fft_malloc<Dtype>(
-        num_of_threads_ * std::max(num_output_, channels_)*
-        fft_map_real_size_ * sizeof(Dtype)));
+          num_of_threads_ * std::max(num_output_, channels_)*
+          fft_map_real_size_ * sizeof(Dtype)));
 
+  bottom_dim_2_ = num_ * channels_;
+  top_dim_2_ = num_ * num_output_;
+  fft_multi_map_bottom_complex_ = (std::complex<Dtype> *)
+      caffe_cpu_fft_malloc<Dtype>(bottom_dim_2_ * fft_map_complex_size_ *
+                                  sizeof(std::complex<Dtype>));
+  fft_multi_map_top_complex_ = (std::complex<Dtype>*)
+      caffe_cpu_fft_malloc<Dtype>(top_dim_2_ * fft_map_complex_size_ *
+                                  sizeof(std::complex<Dtype>));
+  fft_multi_map_bottom_complex_2 = (std::complex<Dtype> *)
+      caffe_cpu_fft_malloc<Dtype>(bottom_dim_2_ * fft_map_complex_size_ *
+                                  sizeof(std::complex<Dtype>));
+  fft_multi_map_top_complex_2 = (std::complex<Dtype>*)
+      caffe_cpu_fft_malloc<Dtype>(top_dim_2_ * fft_map_complex_size_ *
+                                  sizeof(std::complex<Dtype>));
   //  fftw plans
-    fft_handle_ = caffe_cpu_fft_plan_dft_r2c_2d<Dtype>(fft_height_, fft_width_,
-        fft_map_in_real_, fft_map_in_complex_, FFTW_ESTIMATE);
+  fft_handle_ = caffe_cpu_fft_plan_dft_r2c_2d<Dtype>(fft_height_, fft_width_,
+      fft_map_in_real_, fft_map_in_complex_, FFTW_ESTIMATE);
   ifft_handle_ = caffe_cpu_fft_plan_dft_c2r_2d<Dtype>(fft_height_, fft_width_,
-        fft_map_out_complex_, fft_map_out_real_, FFTW_ESTIMATE);
+      fft_map_out_complex_, fft_map_out_real_, FFTW_ESTIMATE);
 
   // plan for fft_many
   int in_N[2];
@@ -243,8 +262,8 @@ void ConvolutionLayerFFT<Dtype>::fft_cpu_setup() {
   in_N_inplace[0] = fft_height_;
   in_N_inplace[1] = 2 * (fft_width_/2+1);
   fft_many_handle_ = caffe_cpu_fft_plan_many_dft_r2c<Dtype>(2, in_N,
-         num_weights, reinterpret_cast<Dtype*>(fft_weights_complex_),
-          in_N_inplace, in_stride, in_dist_inplace, fft_weights_complex_,
+         num_weights, reinterpret_cast<Dtype*>(fft_weights_complex_2),
+          in_N_inplace, in_stride, in_dist_inplace, fft_weights_complex_2,
            out_N, out_stride, out_dist, FFTW_ESTIMATE);
 
   // for openMP
@@ -272,8 +291,13 @@ void ConvolutionLayerFFT<Dtype>::fft_cpu_clean() {
     caffe_cpu_fft_free<Dtype>(fft_map_in_real_);
     caffe_cpu_fft_free<Dtype>(fft_map_in_complex_);
     caffe_cpu_fft_free<Dtype>(fft_weights_complex_);
+    caffe_cpu_fft_free<Dtype>(fft_weights_complex_2);
     caffe_cpu_fft_free<Dtype>(fft_map_out_complex_);
     caffe_cpu_fft_free<Dtype>(fft_map_out_real_);
+    caffe_cpu_fft_free<Dtype>(fft_multi_map_bottom_complex_);
+    caffe_cpu_fft_free<Dtype>(fft_multi_map_top_complex_);
+    caffe_cpu_fft_free<Dtype>(fft_multi_map_bottom_complex_2);
+    caffe_cpu_fft_free<Dtype>(fft_multi_map_top_complex_2);
     caffe_cpu_fft_destroy_plan<Dtype>(fft_handle_);
     caffe_cpu_fft_destroy_plan<Dtype>(ifft_handle_);
     caffe_cpu_fft_destroy_plan<Dtype>(fft_many_handle_);
@@ -284,6 +308,31 @@ void ConvolutionLayerFFT<Dtype>::fft_cpu_clean() {
   fft_cpu_initialized_ = false;
 }
 
+template<typename Dtype>
+void caffe_transpose(const Dtype* input, Dtype* output,
+    size_t const rows, size_t const columns,
+    size_t const r1 = 0, size_t const c1 = 0,
+    size_t r2 = ~(size_t) 0, size_t c2 = ~(size_t) 0,
+    size_t const leaf = 0x20) {
+  if (!~c2) {c2 = columns - c1;}
+  if (!~r2) {r2 = rows - r1;}
+  size_t const di = r2 - r1, dj = c2 - c1;
+  if (di >= dj && di > leaf) {
+    caffe_transpose(input, output, rows, columns, r1, c1, (r1 + r2) / 2, c2);
+    caffe_transpose(input, output, rows, columns, (r1 + r2) / 2, c1, r2, c2);
+  } else if (dj > leaf) {
+    caffe_transpose(input, output, rows, columns, r1, c1, r2, (c1 + c2) / 2);
+    caffe_transpose(input, output, rows, columns, r1, (c1 + c2) / 2, r2, c2);
+  } else {
+    for (ptrdiff_t i1 = (ptrdiff_t) r1, i2 = (ptrdiff_t) (i1 * columns);
+        i1 < (ptrdiff_t) r2; ++i1, i2 += (ptrdiff_t) columns) {
+      for (ptrdiff_t j1 = (ptrdiff_t) c1, j2 = (ptrdiff_t) (j1 * rows);
+          j1 < (ptrdiff_t) c2; ++j1, j2 += (ptrdiff_t) rows) {
+        output[j2 + i1] = input[i2 + j1];
+      }
+    }
+  }
+}
 //=====================Forward CPU========================
 
 //  prepare fft of weights ------------------------------------------
@@ -292,7 +341,7 @@ void ConvolutionLayerFFT<Dtype>::fft_compute_weights() {
   const Dtype *weight = this->blobs_[0]->cpu_data();
   // 0-paddinng before FFT ----------------------
   caffe_memset((num_output_*(channels_ / group_) * fft_map_complex_size_ *
-            sizeof(std::complex<Dtype>)), 0., fft_weights_complex_);
+            sizeof(std::complex<Dtype>)), 0., fft_weights_complex_2);
   int ch_gr = (channels_/group_);
 #pragma omp parallel for
   for (int n = 0; n < num_output_; n++) {
@@ -300,17 +349,17 @@ void ConvolutionLayerFFT<Dtype>::fft_compute_weights() {
       for (int h = 0; h < kernel_h_; h++)
         for (int w = 0; w < kernel_w_; w++ )
           (reinterpret_cast<Dtype*>
-            (fft_weights_complex_))[((n * ch_gr + c) * fft_height_ + h)* 2
+            (fft_weights_complex_2))[((n * ch_gr + c) * fft_height_ + h)* 2
                * (fft_width_ / 2 + 1) + w] =
                weight[((n * ch_gr + c) * kernel_h_ + h) * kernel_w_ + w];
   }
   //  do FFT for all weights -----------------------------------
   caffe_cpu_fft_execute<Dtype>(fft_many_handle_);
+  caffe_transpose(fft_weights_complex_2, fft_weights_complex_, num_weights,
+                  fft_map_complex_size_);
 }
 
-template <typename Dtype>
-void ConvolutionLayerFFT<Dtype>::Forward_cpu_fft_task(
-      const Dtype* bottom_data, Dtype* top_data,  int n) {
+int getTid() {
   int tid = 0;
 #ifdef _OPENMP
   tid = omp_get_thread_num();
@@ -319,93 +368,100 @@ void ConvolutionLayerFFT<Dtype>::Forward_cpu_fft_task(
                << tid << " > OMP_num_THREADS = " << num_of_threads_;
   tid = tid % num_of_threads_;  //  just to be sure
 #endif
-  //  buffers per thread ---------------------
+  return tid;
+}
+
+template <typename Dtype>
+void ConvolutionLayerFFT<Dtype>::Forward_cpu_fft_task(
+    const Dtype* bottom_data, Dtype* top_data) {
   int map_in_size = height_* width_;
-  Dtype* map_in_n = const_cast<Dtype*>
-                     (bottom_data + n * channels_ * map_in_size);
-  Dtype* fft_map_in_real_n = fft_map_in_real_ + tid * fft_map_real_size_;
-  std::complex<Dtype>* fft_map_in_complex_n =
-          fft_map_in_complex_ + tid * fft_map_complex_size_;
-  std::complex<Dtype>* fft_map_out_complex_n =
-          fft_map_out_complex_ + tid * (num_output_*fft_map_complex_size_);
-  Dtype* fft_map_out_real_n =
-          fft_map_out_real_ + tid * (num_output_ * fft_map_real_size_);
-  Dtype* map_out_n = top_data + n* (num_output_ * height_out_ * width_out_);
-  // clear buffers
-  caffe_memset((num_output_*fft_map_complex_size_*
-          sizeof(std::complex<Dtype>)), 0., fft_map_out_complex_n);
+  int gc_ = channels_ / group_;
+  int go_ = num_output_ / group_;
+  std::complex<Dtype> alpha(1.0, 0);
+  std::complex<Dtype> beta(0.0, 0);
 
-  // loop over all channels ---------------------
-  Dtype* map_in;
-  std::complex<Dtype>* weights_complex;
-  std::complex<Dtype>* map_out_complex;
-  Dtype* map_out_real;
-  Dtype* map_out;
-  for (int c = 0; c < channels_; c++) {
-    map_in = map_in_n + c * map_in_size;
-
-    //  0-padding: map_in --> fft_map_in_real -------------
-    caffe_memset((fft_map_real_size_*sizeof(Dtype)), 0., fft_map_in_real_n);
-    for (int h = 0; h < height_; h++) {
-      for (int w = 0; w < width_; w++ )
-      fft_map_in_real_n[(h + pad_h_)* fft_width_ + (w + pad_w_)] =
-              map_in[h * width_ + w ];
-    }
-
-    // FFT: map_in_real --> map_in_complex
-    caffe_cpu_fft_execute_dft_r2c<Dtype>(fft_handle_,
-                fft_map_in_real_n, fft_map_in_complex_n);
-    int g = c / (channels_ / group_);        // channel group
-    int c_offset= c % (channels_ / group_);  // channel_index inside group
-    int out_first = g* (num_output_ / group_);
-    int out_last = (g+1)*(num_output_ / group_);
-    for (int out = out_first; out < out_last; out++) {
-      map_out_complex = fft_map_out_complex_n + out * fft_map_complex_size_;
-      weights_complex = fft_weights_complex_ +
-               (out * (channels_/group_) + c_offset) * fft_map_complex_size_;
-      for (int i = 0; i < fft_map_complex_size_; i++) {
-        // fft for correlation requires conj (fft_of_weights)
-        Dtype x_real = std::real(fft_map_in_complex_n[i]);
-        Dtype x_imag = std::imag(fft_map_in_complex_n[i]);
-        Dtype y_real = std::real(weights_complex[i]);
-        Dtype y_imag = std::imag(weights_complex[i]);
-        Dtype z_real = x_real*y_real + x_imag*y_imag;
-        Dtype z_imag = - x_real*y_imag + x_imag*y_real;
-        map_out_complex[i].real() += z_real;
-        map_out_complex[i].imag() += z_imag;
+  // FFT all channals ---------------------------
+#pragma omp parallel for
+  for (int n = 0; n < num_; ++n) {
+    int tid = getTid();
+    Dtype* fft_map_in_real_n = fft_map_in_real_ + tid * fft_map_real_size_;
+    for (int c = 0; c < channels_; c++) {
+      const Dtype* map_in = bottom_data + (n * channels_ + c) * map_in_size;
+      std::complex<Dtype>* fft_in_complex_ = fft_multi_map_bottom_complex_2 +
+      (n * channels_ + c) * fft_map_complex_size_;
+      //  0-padding: map_in --> fft_map_in_real -------------
+      caffe_memset((fft_map_real_size_*sizeof(Dtype)), 0., fft_map_in_real_n);
+      for (int h = 0; h < height_; h++) {
+        for (int w = 0; w < width_; w++ )
+        fft_map_in_real_n[(h + pad_h_)* fft_width_ + (w + pad_w_)] =
+        map_in[h * width_ + w ];
       }
+      // FFT: map_in_real --> map_in_complex
+      caffe_cpu_fft_execute_dft_r2c<Dtype>(fft_handle_,
+          fft_map_in_real_n, fft_in_complex_);
     }
   }
+  caffe_transpose(fft_multi_map_bottom_complex_2,
+                  fft_multi_map_bottom_complex_, bottom_dim_2_,
+                  fft_map_complex_size_);
+
+#pragma omp parallel for
+  for (int g = 0; g < group_; g++) {
+    for (int i = 0; i < fft_map_complex_size_; i++) {
+      std::complex<Dtype>* in_t_row = fft_multi_map_bottom_complex_ +
+          i * bottom_dim_2_ + g * gc_;
+      std::complex<Dtype>* w_t_row = fft_weights_complex_ +
+          i * num_weights + g * gc_;
+      std::complex<Dtype>* out_t_row = fft_multi_map_top_complex_2 + i
+          * top_dim_2_ + g * go_;
+      caffe_cpu_c_gemm(CblasNoTrans, CblasConjTrans, num_, go_, gc_,
+          alpha, in_t_row, channels_, w_t_row, channels_, beta,
+          out_t_row, num_output_);
+    }
+  }
+  // back transpose map_out_complex
+  caffe_transpose(fft_multi_map_top_complex_2, fft_multi_map_top_complex_,
+                  fft_map_complex_size_, top_dim_2_);
 
   // IFFT: map_out_complex --> map_out_real
   // OPTION: fft_many ?
   Dtype ifft_scale = 1./((Dtype) fft_map_real_size_);
-  for (int out = 0; out < num_output_; out++) {
-    map_out_complex = fft_map_out_complex_n  + out * fft_map_complex_size_;
-    map_out_real = fft_map_out_real_n + out * fft_map_real_size_;
-    map_out = map_out_n + out * map_out_size_;
-    caffe_cpu_fft_execute_dft_c2r<Dtype>(ifft_handle_,
-             map_out_complex, map_out_real);
-    //  post-process: map_out_real --> map_out
-    int h, w;
-    for (int h_out = 0; h_out < height_out_; h_out++) {
-      for (int w_out = 0; w_out < width_out_; w_out++) {
-        h = h_out  * stride_h_;
-        w = w_out  * stride_w_;
-        if ((h < fft_height_) &&  (w < fft_width_)) {
+#pragma omp parallel for
+  for (int n = 0; n < num_; ++n) {
+    int tid = getTid();
+    Dtype* fft_map_out_real_n =
+    fft_map_out_real_ + tid * (num_output_ * fft_map_real_size_);
+    for (int out = 0; out < num_output_; out++) {
+      std::complex<Dtype>* map_out_complex = fft_multi_map_top_complex_ +
+      (n * num_output_ + out) * fft_map_complex_size_;
+      Dtype* map_out_real = fft_map_out_real_n + out * fft_map_real_size_;
+      Dtype* map_out = top_data + (n * num_output_ + out) * map_out_size_;
+      caffe_cpu_fft_execute_dft_c2r<Dtype>(ifft_handle_,
+          map_out_complex, map_out_real);
+      //  post-process: map_out_real --> map_out
+      int h, w;
+      for (int h_out = 0; h_out < height_out_; h_out++) {
+        for (int w_out = 0; w_out < width_out_; w_out++) {
+          h = h_out * stride_h_;
+          w = w_out * stride_w_;
+          if ((h < fft_height_) && (w < fft_width_)) {
             map_out[h_out*width_out_ + w_out] =
-              (ifft_scale * map_out_real[h*fft_width_ + w]);
+            (ifft_scale * map_out_real[h*fft_width_ + w]);
+          }
         }
       }
     }
   }
   //  bias
   if (bias_term_) {
-    int top_offset_n= n* (num_output_ * height_out_* width_out_);
-    caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_output_,
+#pragma omp parallel for
+    for (int n = 0; n < num_; ++n) {
+      int top_offset_ = n * (num_output_ * height_out_ * width_out_);
+      caffe_cpu_gemm<Dtype>(CblasNoTrans, CblasNoTrans, num_output_,
           N_, 1, (Dtype)1., this->blobs_[1]->cpu_data(),
           reinterpret_cast<const Dtype*>(bias_multiplier_.cpu_data()),
-          (Dtype)1., top_data + top_offset_n);
+          (Dtype)1., top_data + top_offset_);
+    }
   }
 }
 
@@ -415,14 +471,10 @@ Dtype ConvolutionLayerFFT<Dtype>::Forward_cpu_fft(
   if (fft_cpu_initialized_ != true ) fft_setup();
 
   fft_compute_weights();
-
   for (int i = 0; i < bottom.size(); ++i) {
     const Dtype* bottom_data = bottom[i]->cpu_data();
     Dtype* top_data= top[i]->mutable_cpu_data();
-#pragma omp parallel for
-    for (int n = 0; n < num_; ++n) {
-      Forward_cpu_fft_task(bottom_data, top_data, n);
-    }
+    Forward_cpu_fft_task(bottom_data, top_data);
   }
   return Dtype(0.);
 }
@@ -503,93 +555,84 @@ void ConvolutionLayerFFT<Dtype>::Forward_cpu(
 
 template <typename Dtype>
 void ConvolutionLayerFFT<Dtype>::Backward_cpu_fft_task(
-        const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top,
-         const Dtype* weight, int i, int n) {
-  const Dtype* top_diff = top[i]->cpu_diff();
-  Dtype* bottom_diff = bottom[i]->mutable_cpu_diff();
+    Dtype* bottom_diff, const Dtype* top_diff) {
   //  back propagation is from top to bottom: the top is the inputs.
-  int tid = 0;
-  #ifdef _OPENMP
-  tid = omp_get_thread_num();
-  if (tid >= num_of_threads_)
-      LOG(FATAL) << "ConvLayer::Backward_cpu_fft: omp_get_thread_num()="<< tid
-                    << " > OMP_num_THREADS = " << num_of_threads_;
-  tid = tid % num_of_threads_;  //  just to be sure
-#endif
-
   int map_in_size = height_out_* width_out_;
-  Dtype* map_in_n = const_cast<Dtype*>(top_diff + top[i]->offset(n));
-  Dtype* fft_map_in_real_n = fft_map_in_real_ + tid * fft_map_real_size_;
-  std::complex<Dtype>* fft_map_in_complex_n =
-         fft_map_in_complex_ + tid * fft_map_complex_size_;
-  std::complex<Dtype>* fft_map_out_complex_n =
-         fft_map_out_complex_ + tid * (channels_ * fft_map_complex_size_);
-  Dtype* fft_map_out_real_n =
-         fft_map_out_real_ + tid * (channels_ * fft_map_real_size_);
-  Dtype* map_out_n = reinterpret_cast<Dtype*>
-                      (bottom_diff + bottom[i]->offset(n));
-  // clear buffers
-  caffe_memset(fft_map_real_size_ * sizeof(Dtype), 0., fft_map_in_real_n);
-  caffe_memset((channels_ * fft_map_complex_size_*
-                 sizeof(std::complex<Dtype>)), 0., fft_map_out_complex_n);
+  int gc_ = channels_ / group_;
+  int go_ = num_output_ / group_;
+  std::complex<Dtype> alpha(1.0, 0);
+  std::complex<Dtype> beta(0.0, 0);
 
-  // loop over all outputs ---------------------
-  Dtype* map_in;
-  std::complex<Dtype>* weights_complex;
-  std::complex<Dtype>* map_out_complex;
-  Dtype* map_out_real;
-  Dtype* map_out;
-  for (int out = 0; out < num_output_; out++) {
-    map_in = map_in_n + out * map_in_size;
-    //  0-padding: map_out --> fft_map_in_real -------------
-    for (int h = 0; h < height_out_; h++) {
-      for (int w = 0; w < width_out_; w++) {
-        int h_pad = h * stride_h_;
-        int w_pad = w * stride_w_;
-        fft_map_in_real_n[h_pad*fft_width_ + w_pad] =
-              map_in[h*width_out_ + w  ];
+#pragma omp parallel for
+  for (int n = 0; n < num_; ++n) {
+    int tid = getTid();
+    Dtype* fft_map_in_real_n = fft_map_in_real_ + tid * fft_map_real_size_;
+    for (int out = 0; out < num_output_; out++) {
+      const Dtype* map_in = top_diff + (n * num_output_ + out) * map_in_size;
+      std::complex<Dtype>* fft_in_complex = fft_multi_map_top_complex_ +
+      (n * num_output_ + out) * fft_map_complex_size_;
+      caffe_memset(fft_map_real_size_ * sizeof(Dtype), 0., fft_map_in_real_n);
+      //  0-padding: map_out --> fft_map_in_real -------------
+      for (int h = 0; h < height_out_; h++) {
+        for (int w = 0; w < width_out_; w++) {
+          int h_pad = h * stride_h_;
+          int w_pad = w * stride_w_;
+          fft_map_in_real_n[h_pad*fft_width_ + w_pad] =
+          map_in[h*width_out_ + w ];
+        }
       }
-    }
-    // FFT: map_in_real --> map_in_complex
-    caffe_cpu_fft_execute_dft_r2c<Dtype>(fft_handle_,
-              fft_map_in_real_n, fft_map_in_complex_n);
-    int g = out / (num_output_ / group_);           //  group
-    int c_first = g* (channels_ / group_);
-    int c_last = (g+1)*(channels_ / group_);
-    for (int c = c_first; c < c_last; c++) {
-      int c_offset = c % (channels_ / group_);
-      map_out_complex = fft_map_out_complex_n + c * fft_map_complex_size_;
-      weights_complex = fft_weights_complex_   +
-                 (out * (channels_/group_) + c_offset) * fft_map_complex_size_;
-      for (int i = 0; i < fft_map_complex_size_; i++) {
-        Dtype x_real = std::real(fft_map_in_complex_n[i]);
-        Dtype x_imag = std::imag(fft_map_in_complex_n[i]);
-        Dtype y_real = std::real(weights_complex[i]);
-        Dtype y_imag = std::imag(weights_complex[i]);
-        Dtype z_real = x_real*y_real - x_imag*y_imag;
-        Dtype z_imag = x_real*y_imag + x_imag*y_real;
-        map_out_complex[i].real() += z_real;
-        map_out_complex[i].imag() += z_imag;
-     }
+      // FFT: map_in_real --> map_in_complex
+      caffe_cpu_fft_execute_dft_r2c<Dtype>(fft_handle_,
+          fft_map_in_real_n, fft_in_complex);
     }
   }
+  caffe_transpose(fft_multi_map_top_complex_, fft_multi_map_top_complex_2,
+                  top_dim_2_, fft_map_complex_size_);
+
+#pragma omp parallel for
+  for (int i = 0; i < fft_map_complex_size_; i++) {
+    for (int g = 0; g < group_; g++) {
+      std::complex<Dtype>* in_t_row = fft_multi_map_top_complex_2 +
+          i * top_dim_2_ + g * go_;
+      std::complex<Dtype>* w_t_row = fft_weights_complex_ +
+          i * num_weights + g * gc_;
+      std::complex<Dtype>* out_t_row = fft_multi_map_bottom_complex_2 +
+          i * bottom_dim_2_ + g * gc_;
+      caffe_cpu_c_gemm(CblasNoTrans, CblasNoTrans, num_, gc_, go_,
+          alpha, in_t_row, num_output_, w_t_row, channels_, beta,
+          out_t_row, channels_);
+    }
+  }
+
+  // back transpose map_out_complex
+  caffe_transpose(fft_multi_map_bottom_complex_2,
+                  fft_multi_map_bottom_complex_,
+                  fft_map_complex_size_, bottom_dim_2_);
+
   // IFFT: map_out_complex --> map_out_real
   // OPTION:  fft many ?
   Dtype ifft_scale = 1./((Dtype) fft_map_real_size_);
-  for (int c = 0; c < channels_; c++) {
-    map_out_complex = fft_map_out_complex_n  + c * fft_map_complex_size_;
-    map_out_real = fft_map_out_real_n;
-    caffe_cpu_fft_execute_dft_c2r<Dtype>(ifft_handle_,
-            map_out_complex, map_out_real);
-    //  post-process: map_out_real --> map_out
-    map_out = map_out_n + c * map_size_;
-    int h, w;
-    for (int h_out = 0; h_out < height_; h_out++) {
-      for (int w_out = 0; w_out < width_; w_out++) {
-        h = h_out + pad_h_;
-        w = w_out + pad_w_;
-        map_out[h_out*width_ + w_out] =
-             (ifft_scale * map_out_real[h*fft_width_ + w]);
+#pragma omp parallel for
+  for (int n = 0; n < num_; ++n) {
+    int tid = getTid();
+    Dtype* fft_map_out_real_n =
+    fft_map_out_real_ + tid * (channels_ * fft_map_real_size_);
+    for (int c = 0; c < channels_; c++) {
+      std::complex<Dtype>* map_out_complex = fft_multi_map_bottom_complex_ +
+      (n * channels_ + c) * fft_map_complex_size_;
+      Dtype* map_out_real = fft_map_out_real_n + c * fft_map_real_size_;
+      caffe_cpu_fft_execute_dft_c2r<Dtype>(ifft_handle_,
+          map_out_complex, map_out_real);
+      //  post-process: map_out_real --> map_out
+      Dtype* map_out = bottom_diff + (n * channels_ + c) * map_size_;
+      int h, w;
+      for (int h_out = 0; h_out < height_; h_out++) {
+        for (int w_out = 0; w_out < width_; w_out++) {
+          h = h_out + pad_h_;
+          w = w_out + pad_w_;
+          map_out[h_out*width_ + w_out] =
+          (ifft_scale * map_out_real[h*fft_width_ + w]);
+        }
       }
     }
   }
@@ -750,10 +793,8 @@ void ConvolutionLayerFFT<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
           // WARNING: Assume fft for weights was computed in Forward
           // This assumption can fail in runtest, if only Backward() is called!
           // fft_compute_weights();
-#pragma omp parallel for
-          for (int n = 0; n < num_; ++n) {
-            Backward_cpu_fft_task(bottom, top, weight, i, n);
-          }
+          Backward_cpu_fft_task(bottom[i]->mutable_cpu_diff(),
+                                top[i]->cpu_diff());
         } else {  // back-prop by gemm
 #pragma omp parallel for
           for (int n = 0; n < num_; ++n) {
@@ -776,7 +817,7 @@ template <typename Dtype>
 void ConvolutionLayerFFT<Dtype>::fft_gpu_compute_weights() { NO_GPU; }
 template <typename Dtype>
 void ConvolutionLayerFFT<Dtype>::Forward_gpu_fft_task(
-      const Dtype* bottom_data, Dtype* top_data, const Dtype* weight, int n) {
+      const Dtype* bottom_data, Dtype* top_data) {
             NO_GPU; }
 template <typename Dtype>
 Dtype ConvolutionLayerFFT<Dtype>::Forward_gpu_fft(
