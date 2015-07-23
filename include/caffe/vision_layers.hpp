@@ -183,8 +183,7 @@ class ConvolutionLayerFFT : public ConvolutionLayer<Dtype> {
 // Forward CPU
   virtual Dtype Forward_cpu_fft(
           const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top);
-  virtual void Forward_cpu_fft_task(const Dtype *bottom_data, Dtype* top_data,
-          int n);
+  virtual void Forward_cpu_fft_task(const Dtype *bottom_data, Dtype* top_data);
   virtual void Forward_cpu_task(const Dtype* bottom_data, Dtype* top_data,
   Dtype* col_buff, const Dtype* weight, int n);
   virtual void fft_compute_weights();
@@ -193,16 +192,13 @@ class ConvolutionLayerFFT : public ConvolutionLayer<Dtype> {
 // Forward GPU
   virtual Dtype Forward_gpu_fft(const vector<Blob<Dtype>*>& bottom,
           const vector<Blob<Dtype>*>& top);
-  virtual void Forward_gpu_fft_task(const Dtype *bottom_data, Dtype* top_data,
-          const Dtype* weight, int n);
+  virtual void Forward_gpu_fft_task(const Dtype *bottom_data, Dtype* top_data);
   virtual void Forward_gpu_task(const vector<Blob<Dtype>*>& bottom,
           const vector<Blob<Dtype>*>& top, int i, int n);
   virtual void fft_gpu_compute_weights();
 
 // Backward CPU
-  virtual void Backward_cpu_fft_task(const vector<Blob<Dtype>*>& bottom,
-          const vector<Blob<Dtype>*>& top,
-           const Dtype* weight, int i, int n);
+  virtual void Backward_cpu_fft_task(Dtype* bottom_diff, const Dtype* top_diff);
   virtual void Backward_cpu_weight_diff_task(const Dtype* top_diff,
           const vector<Blob<Dtype>*>& bottom, int i, int n);
   virtual void Backward_cpu_bottom_diff_task(
@@ -210,9 +206,7 @@ class ConvolutionLayerFFT : public ConvolutionLayer<Dtype> {
            const Dtype* weight, int i, int n);
 
 // Backward GPU
-  virtual void Backward_gpu_fft_task(const vector<Blob<Dtype>*>& bottom,
-          const vector<Blob<Dtype>*>& top,
-           const Dtype* weight, int i, int n);
+  virtual void Backward_gpu_fft_task(Dtype* bottom_diff, const Dtype* top_diff);
   virtual void Backward_gpu_weight_diff_task(const Dtype* top_diff,
           const vector<Blob<Dtype>*>& bottom, int i, int n);
   virtual void Backward_gpu_bottom_diff_task(
@@ -246,8 +240,16 @@ class ConvolutionLayerFFT : public ConvolutionLayer<Dtype> {
   Dtype* fft_weights_real_;
   Dtype* fft_map_in_real_;
   std::complex<Dtype>* fft_weights_complex_;
+  std::complex<Dtype>* fft_weights_complex_2;
   std::complex<Dtype>* fft_map_in_complex_;
   std::complex<Dtype>* fft_map_out_complex_;
+  int bottom_dim_2_;
+  int num_weights;
+  int top_dim_2_;
+  std::complex<Dtype>* fft_multi_map_bottom_complex_;
+  std::complex<Dtype>* fft_multi_map_bottom_complex_2;
+  std::complex<Dtype>* fft_multi_map_top_complex_;
+  std::complex<Dtype>* fft_multi_map_top_complex_2;
   Dtype* fft_map_out_real_;
   void* fft_handle_;
   void* ifft_handle_;
@@ -257,8 +259,13 @@ class ConvolutionLayerFFT : public ConvolutionLayer<Dtype> {
   Dtype* fft_gpu_weights_real_;
   Dtype* fft_gpu_map_in_real_;
   std::complex<Dtype>* fft_gpu_weights_complex_;
+  std::complex<Dtype>* fft_gpu_weights_complex_t;
   std::complex<Dtype>* fft_gpu_map_in_complex_;
   std::complex<Dtype>* fft_gpu_map_out_complex_;
+  std::complex<Dtype>* fft_gpu_multi_map_bottom_complex_;
+  std::complex<Dtype>* fft_gpu_multi_map_bottom_complex_t;
+  std::complex<Dtype>* fft_gpu_multi_map_top_complex_t;
+  std::complex<Dtype>* fft_gpu_multi_map_top_complex_;
   Dtype* fft_gpu_map_out_real_;
   cufftHandle fft_gpu_handle_;
   cufftHandle ifft_gpu_handle_;
