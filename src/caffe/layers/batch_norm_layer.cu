@@ -83,9 +83,23 @@ void BatchNormLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
         variance_.mutable_gpu_data());
     // int m = N*S;    // m = N*H*W
     // Dtype bias_corr = m > 1 ? Dtype(m)/(m-1) : 1;
-    // bias_corr = 1.;
     // caffe_gpu_scale(C, bias_corr, variance_.gpu_data(),
     //    variance_.mutable_gpu_data());
+
+    // clip variance
+
+    if ((this->phase_ == TRAIN) && (iter_ <= BN_VARIANCE_CLIP_START))
+      iter_++;
+    if (iter_ > BN_VARIANCE_CLIP_START) {
+      caffe_gpu_eltwise_min(C,
+          Dtype(BN_VARIANCE_CLIP_CONST), this->blobs_[3]->gpu_data(),
+          Dtype(1.0), variance_.mutable_gpu_data());
+      caffe_gpu_eltwise_max(C,
+          Dtype((1.)/BN_VARIANCE_CLIP_CONST), this->blobs_[3]->gpu_data(),
+          Dtype(1.0), variance_.mutable_gpu_data());
+      caffe_gpu_eltwise_max(C, Dtype(eps_), ones_C_.gpu_data(),
+          Dtype(1.0), variance_.mutable_gpu_data());
+    }
 
     //  update global mean and variance
     caffe_gpu_axpby(C, Dtype(1. - moving_average_fraction_), mean_.gpu_data(),

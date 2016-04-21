@@ -7,6 +7,9 @@
 #include "caffe/layer.hpp"
 #include "caffe/proto/caffe.pb.h"
 
+#define BN_VARIANCE_CLIP_START 1000
+#define BN_VARIANCE_CLIP_CONST 4.0
+
 namespace caffe {
 
 /**
@@ -81,11 +84,13 @@ class BatchNormLayer : public Layer<Dtype> {
       const Dtype *x, Dtype *y);
 
   // auxiliary arrays
-  Blob<Dtype> ones_N_, ones_HW_;
+  Blob<Dtype> ones_N_, ones_HW_, ones_C_;
 
   Blob<Dtype> temp_;
   Blob<Dtype> temp_C_;
   Blob<Dtype> temp_NC_;
+
+  int iter_;
 };
 
 }  // namespace caffe

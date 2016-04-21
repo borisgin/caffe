@@ -47,6 +47,8 @@ void BatchNormLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
 
     sz[0]=1;
     this->blobs_[4].reset(new Blob<Dtype>(sz));
+
+    iter_ = 0;
   }
 }
 
@@ -71,6 +73,10 @@ void BatchNormLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   sz[0] = N;
   ones_N_.Reshape(sz);
   caffe_set(ones_N_.count(), Dtype(1.), ones_N_.mutable_cpu_data());
+
+  sz[0] = channels_;
+  ones_C_.Reshape(sz);
+  caffe_set(ones_C_.count(), Dtype(1.), ones_C_.mutable_cpu_data());
 
   sz[0] = S;
   ones_HW_.Reshape(sz);
@@ -131,6 +137,7 @@ void BatchNormLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   const Dtype* bottom_data = bottom[0]->cpu_data();
   Dtype* top_data = top[0]->mutable_cpu_data();
 
+
   if (use_global_stats_) {
     // use global mean/variance
     caffe_copy(C, this->blobs_[2]->cpu_data(), mean_.mutable_cpu_data());
@@ -152,11 +159,27 @@ void BatchNormLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     compute_mean_per_channel_cpu(N, C, S, temp_.cpu_data(),
         variance_.mutable_cpu_data());
 
-    // int m = N*S;  // N*H*W
+    // int m = N*S;
     // Dtype bias_corr = m > 1 ? Dtype(m)/(m-1) : 1;
-    // bias_corr = 1.;
     // caffe_cpu_scale(C, bias_corr, variance_.cpu_data(),
-    //    variance_.mutable_cpu_data());
+    //     variance_.mutable_cpu_data());
+
+    // clip variance. TODO: should we also clip mean ?
+    if ((this->phase_ == TRAIN) && (iter_ <= BN_VARIANCE_CLIP_START))
+      iter_++;
+    if (iter_ > BN_VARIANCE_CLIP_START) {
+      // variance = min(variance, 4* global_variance)
+      caffe_cpu_eltwise_min(C,
+          Dtype(BN_VARIANCE_CLIP_CONST), this->blobs_[3]->cpu_data(),
+          Dtype(1.0), variance_.mutable_cpu_data());
+      // variance = max(variance, 1/4 * global_variance)
+      caffe_cpu_eltwise_max(C,
+          Dtype((1.)/BN_VARIANCE_CLIP_CONST), this->blobs_[3]->cpu_data(),
+          Dtype(1.0), variance_.mutable_cpu_data());
+      // when variance[c]~ 0 variance = max(eps, variance)
+      caffe_cpu_eltwise_max(C, Dtype(eps_), ones_C_.cpu_data(),
+          Dtype(1.0), variance_.mutable_cpu_data());
+    }
 
     //  update global mean and variance
     caffe_cpu_axpby(C, Dtype(1. - moving_average_fraction_), mean_.cpu_data(),
