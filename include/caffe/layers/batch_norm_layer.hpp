@@ -7,7 +7,7 @@
 #include "caffe/layer.hpp"
 #include "caffe/proto/caffe.pb.h"
 
-#define BN_VARIANCE_CLIP_START 1000
+#define BN_VARIANCE_CLIP_START 200
 #define BN_VARIANCE_CLIP_CONST 4.0
 
 namespace caffe {
@@ -73,24 +73,26 @@ class BatchNormLayer : public Layer<Dtype> {
   Dtype eps_;
 
   virtual void multicast_cpu(int N, int C, int S, const Dtype *x, Dtype *y);
-  virtual void multicast_gpu(int N, int C, int S, const Dtype *x, Dtype *y);
   virtual void compute_sum_per_channel_cpu(int N, int C, int S,
-      const Dtype *x, Dtype *y);
-  virtual void compute_sum_per_channel_gpu(int N, int C, int S,
       const Dtype *x, Dtype *y);
   virtual void compute_mean_per_channel_cpu(int N, int C, int S,
       const Dtype *x, Dtype *y);
+
+#ifndef CPU_ONLY
+  virtual void compute_sum_per_channel_gpu(int N, int C, int S,
+      const Dtype *x, Dtype *y);
+  virtual void multicast_gpu(int N, int C, int S, const Dtype *x, Dtype *y);
   virtual void compute_mean_per_channel_gpu(int N, int C, int S,
       const Dtype *x, Dtype *y);
+#endif
+
+  int iter_;
 
   // auxiliary arrays
   Blob<Dtype> ones_N_, ones_HW_, ones_C_;
-
   Blob<Dtype> temp_;
   Blob<Dtype> temp_C_;
   Blob<Dtype> temp_NC_;
-
-  int iter_;
 };
 
 }  // namespace caffe
