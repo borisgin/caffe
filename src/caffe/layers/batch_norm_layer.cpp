@@ -38,15 +38,12 @@ void BatchNormLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     shared_ptr<Filler<Dtype> > bias_filler(
       GetFiller<Dtype>(this->layer_param_.batch_norm_param().bias_filler()));
     bias_filler->Fill(this->blobs_[1].get());
-
     caffe_set(this->blobs_[2]->count(), Dtype(0.),
         this->blobs_[2]->mutable_cpu_data());
     caffe_set(this->blobs_[3]->count(), Dtype(0.),
         this->blobs_[3]->mutable_cpu_data());
-
     sz[0]=1;
     this->blobs_[4].reset(new Blob<Dtype>(sz));
-
     iter_ = 0;
   }
 }
@@ -57,7 +54,6 @@ void BatchNormLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   if (bottom[0]->num_axes() > 1)
     CHECK_EQ(bottom[0]->shape(1), channels_);
   top[0]->ReshapeLike(*bottom[0]);
-
   int N = bottom[0]->shape(0);
   int NC = N* channels_;
   int S = bottom[0]->count() / NC;
@@ -68,22 +64,17 @@ void BatchNormLayer<Dtype>::Reshape(const vector<Blob<Dtype>*>& bottom,
   variance_.Reshape(sz);
   inv_variance_.Reshape(sz);
   temp_C_.Reshape(sz);
-
   sz[0] = N;
   ones_N_.Reshape(sz);
   caffe_set(ones_N_.count(), Dtype(1.), ones_N_.mutable_cpu_data());
-
   sz[0] = channels_;
   ones_C_.Reshape(sz);
   caffe_set(ones_C_.count(), Dtype(1.), ones_C_.mutable_cpu_data());
-
   sz[0] = S;
   ones_HW_.Reshape(sz);
   caffe_set(ones_HW_.count(), Dtype(1.), ones_HW_.mutable_cpu_data());
-
   sz[0] = NC;
   temp_NC_.Reshape(sz);
-
   temp_.ReshapeLike(*bottom[0]);
   x_norm_.ReshapeLike(*bottom[0]);
 }
@@ -132,7 +123,6 @@ void BatchNormLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   int C = channels_;
   int S = bottom[0]->count(0) / (N*C);
   int top_size = top[0]->count();
-
   const Dtype* bottom_data = bottom[0]->cpu_data();
   Dtype* top_data = top[0]->mutable_cpu_data();
 
@@ -176,7 +166,6 @@ void BatchNormLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       caffe_cpu_eltwise_min(C,
           Dtype(BN_VARIANCE_CLIP_CONST), temp_C_.cpu_data(),
           Dtype(1.0), variance_.mutable_cpu_data());
-
       // clip from below
       caffe_cpu_eltwise_max(C,
           Dtype((1.)/BN_VARIANCE_CLIP_CONST), this->blobs_[3]->cpu_data(),
@@ -206,7 +195,6 @@ void BatchNormLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   caffe_copy(top_size, top_data, x_norm_.mutable_cpu_data());
 
   // -- STAGE 2:  Y = X_norm * scale[c] + shift[c]  -----------------
-
   // Y = X_norm * scale[c]
   const Blob<Dtype> & scale_data = *(this->blobs_[0]);
   multicast_cpu(N, C, S, scale_data.cpu_data(), temp_.mutable_cpu_data());
@@ -227,34 +215,27 @@ void BatchNormLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
   int top_size = top[0]->count();
 
   // --  STAGE 1: compute dE/d(scale) and dE/d(shift) ---------------
-
   const Dtype* top_diff = top[0]->cpu_diff();
-
   // scale_diff: dE/d(scale)  =  sum(dE/dY .* X_norm)
   Dtype* scale_diff = this->blobs_[0]->mutable_cpu_diff();
   caffe_mul(top_size, top_diff, x_norm_.cpu_data(), temp_.mutable_cpu_diff());
   compute_sum_per_channel_cpu(N, C, S, temp_.cpu_diff(), scale_diff);
-
   // shift_diff: dE/d(shift) = sum (dE/dY)
   Dtype* shift_diff = this->blobs_[1]->mutable_cpu_diff();
   compute_sum_per_channel_cpu(N, C, S, top_diff, shift_diff);
 
   // --  STAGE 2: backprop dE/d(x_norm) = dE/dY .* scale ------------
-
   // dE/d(X_norm) = dE/dY * scale[c]
   const Dtype* scale_data = this->blobs_[0]->cpu_data();
   multicast_cpu(N, C, S, scale_data, temp_.mutable_cpu_data());
   caffe_mul(top_size, top_diff, temp_.cpu_data(), x_norm_.mutable_cpu_diff());
 
   // --  STAGE 3: backprop dE/dY --> dE/dX --------------------------
-
   // ATTENTION: from now on we will use notation Y:= X_norm
   // if Y = (X-mean(X))/(sqrt(var(X)+eps)), then
-  //
   // dE(Y)/dX =  (dE/dY - mean(dE/dY) - mean(dE/dY .* Y) .* Y)
   //             ./ sqrt(var(X) + eps)
-  // where
-  // .* and ./ are element-wise product and division,
+  // where  .* and ./ are element-wise product and division,
   // mean, var, sum are computed along all dimensions except the channels.
 
   const Dtype* top_data = x_norm_.cpu_data();
@@ -273,20 +254,15 @@ void BatchNormLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
   compute_mean_per_channel_cpu(N, C, S, temp_.cpu_diff(),
       temp_C_.mutable_cpu_diff());
   multicast_cpu(N, C, S, temp_C_.cpu_diff(), temp_.mutable_cpu_diff());
-
   // bottom = mean(dE/dY .* Y) .* Y
   caffe_mul(top_size, temp_.cpu_diff(), top_data, bottom_diff);
-
   // temp = mean(dE/dY)
   compute_mean_per_channel_cpu(N, C, S, top_diff, temp_C_.mutable_cpu_diff());
   multicast_cpu(N, C, S, temp_C_.cpu_diff(), temp_.mutable_cpu_diff());
-
   // bottom = mean(dE/dY) + mean(dE/dY .* Y) .* Y
   caffe_add(top_size, temp_.cpu_diff(), bottom_diff, bottom_diff);
-
   // bottom = dE/dY - mean(dE/dY)-mean(dE/dY \cdot Y) \cdot Y
   caffe_cpu_axpby(top_size, Dtype(1.), top_diff, Dtype(-1.), bottom_diff);
-
   // dE/dX = dE/dX ./ sqrt(var(X) + eps)
   multicast_cpu(N, C, S, inv_variance_.cpu_data(), temp_.mutable_cpu_data());
   caffe_mul(top_size, bottom_diff, temp_.cpu_data(), bottom_diff);
