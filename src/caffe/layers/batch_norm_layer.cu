@@ -83,7 +83,7 @@ void BatchNormLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
     // clip variance
     if ((this->phase_ == TRAIN) && (iter_ <= BN_VARIANCE_CLIP_START))
       iter_++;
-    if (iter_ > BN_VARIANCE_CLIP_START) {
+    if (clip_variance_ && (iter_ > BN_VARIANCE_CLIP_START)) {
       // clip from above
       // temp_C_[c] = average + gobal_var[c]
       Dtype y;

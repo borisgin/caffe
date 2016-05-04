@@ -499,7 +499,7 @@ message BatchNormParameter {
   optional float moving_average_fraction = 2 [default = .999];
   // Small value to add to the variance estimate so that we don't divide by
   // zero.
-  optional float eps = 3 [default = 1e-5];
+  optional float eps = 3 [default = 1e-5];  
   optional FillerParameter scale_filler = 5;
   optional FillerParameter bias_filler = 6;
   enum Engine {
@@ -507,6 +507,7 @@ message BatchNormParameter {
     CAFFE = 1;
     CUDNN = 2;
   }
+  optional bool clip_variance = 7 [default = false];
   optional Engine engine = 15 [default = DEFAULT];
 }
 

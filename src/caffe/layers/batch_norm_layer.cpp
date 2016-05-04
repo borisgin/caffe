@@ -13,6 +13,7 @@ void BatchNormLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   BatchNormParameter param = this->layer_param_.batch_norm_param();
   moving_average_fraction_ = param.moving_average_fraction();
   use_global_stats_ = this->phase_ == TEST;
+  clip_variance_ = param.clip_variance();
   if (param.has_use_global_stats())
     use_global_stats_ = param.use_global_stats();
   if (bottom[0]->num_axes() == 1)
@@ -155,7 +156,7 @@ void BatchNormLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     // clip variance
     if ((this->phase_ == TRAIN) && (iter_ <= BN_VARIANCE_CLIP_START))
       iter_++;
-    if (iter_ > BN_VARIANCE_CLIP_START) {
+    if (clip_variance_ && (iter_ > BN_VARIANCE_CLIP_START)) {
       // clip from above
       // temp_C_[c] = average_var + global_var[c]
       Dtype y = caffe_cpu_asum(C, this->blobs_[3]->cpu_data());
