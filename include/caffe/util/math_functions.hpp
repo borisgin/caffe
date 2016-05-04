@@ -33,12 +33,12 @@ template <typename Dtype>
 void caffe_cpu_axpby(const int N, const Dtype alpha, const Dtype* X,
     const Dtype beta, Dtype* Y);
 
-// y[i]= max(a*x[i], b*y[i])
+// y[i] = max(a*x[i], b*y[i])
 template <typename Dtype>
 void caffe_cpu_eltwise_max(const int N, const Dtype alpha, const Dtype* X,
     const Dtype beta, Dtype* Y);
 
-// y[i]= min(a*x[i], b*y[i])
+// y[i] = min( a*x[i], b*y[i])
 template <typename Dtype>
 void caffe_cpu_eltwise_min(const int N, const Dtype alpha, const Dtype* X,
     const Dtype beta, Dtype* Y);
@@ -61,6 +61,9 @@ void caffe_scal(const int N, const Dtype alpha, Dtype *X);
 
 template <typename Dtype>
 void caffe_sqr(const int N, const Dtype* a, Dtype* y);
+
+template <typename Dtype>
+void caffe_sqrt(const int N, const Dtype* a, Dtype* y);
 
 template <typename Dtype>
 void caffe_add(const int N, const Dtype* a, const Dtype* b, Dtype* y);
@@ -216,6 +219,9 @@ void caffe_gpu_exp(const int n, const Dtype* a, Dtype* y);
 
 template <typename Dtype>
 void caffe_gpu_log(const int n, const Dtype* a, Dtype* y);
+
+template <typename Dtype>
+void caffe_gpu_sqrt(const int n, const Dtype* a, Dtype* y);
 
 template <typename Dtype>
 void caffe_gpu_powx(const int n, const Dtype* a, const Dtype b, Dtype* y);

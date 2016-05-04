@@ -71,7 +71,8 @@ void BatchNormLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
       Dtype(1.), top_data);
   if (!use_global_stats_) {
      //  compute variance E (X-EX)^2
-    caffe_gpu_powx(top_size, top_data, Dtype(2.), temp_.mutable_gpu_data());
+//   caffe_gpu_powx(top_size, top_data, Dtype(2.), temp_.mutable_gpu_data());
+    caffe_gpu_mul(top_size, top_data, top_data, temp_.mutable_gpu_data());
     compute_mean_per_channel_gpu(N, C, S, temp_.gpu_data(),
         variance_.mutable_gpu_data());
     // int m = N*S;    // m = N*H*W
@@ -114,8 +115,12 @@ void BatchNormLayer<Dtype>::Forward_gpu(const vector<Blob<Dtype>*>& bottom,
   }
   //  inv_var = (eps + variance)^(-0.5)
   caffe_gpu_add_scalar(C, eps_, variance_.mutable_gpu_data());
-  caffe_gpu_powx(C, variance_.gpu_data(), Dtype(-0.5),
-      inv_variance_.mutable_gpu_data());
+//  caffe_gpu_powx(C, variance_.gpu_data(), Dtype(-0.5),
+//      inv_variance_.mutable_gpu_data());
+  caffe_gpu_sqrt(C, variance_.gpu_data(), inv_variance_.mutable_gpu_data());
+  caffe_gpu_div(C, ones_C_.gpu_data(), inv_variance_.gpu_data(),
+                   inv_variance_.mutable_gpu_data());
+
   //  X_norm = (X-EX) * inv_var
   multicast_gpu(N, C, S, inv_variance_.gpu_data(), temp_.mutable_gpu_data());
   caffe_gpu_mul(top_size, top_data, temp_.gpu_data(), top_data);

@@ -7,9 +7,6 @@
 #include "caffe/layer.hpp"
 #include "caffe/proto/caffe.pb.h"
 
-#define BN_VARIANCE_CLIP_START 200
-#define BN_VARIANCE_CLIP_CONST 4.0
-
 namespace caffe {
 
 /**
@@ -56,6 +53,9 @@ class BatchNormLayer : public Layer<Dtype> {
   virtual inline int ExactNumBottomBlobs() const { return 1; }
   virtual inline int ExactNumTopBlobs() const { return 1; }
 
+  static const int BN_VARIANCE_CLIP_START = 200;
+  static const Dtype BN_VARIANCE_CLIP_CONST = 4.0;
+
  protected:
   virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top);
@@ -85,11 +85,12 @@ class BatchNormLayer : public Layer<Dtype> {
   int channels_;
   Dtype eps_;
   int iter_;
+  // arrays of ones
+  Blob<Dtype> ones_N_, ones_HW_, ones_C_;  // ones[N], ones[H*W], ones[c]
   // auxiliary arrays
-  Blob<Dtype> ones_N_, ones_HW_, ones_C_;
-  Blob<Dtype> temp_;
-  Blob<Dtype> temp_C_;
-  Blob<Dtype> temp_NC_;
+  Blob<Dtype> temp_;      // temp_[N*C*H*W]
+  Blob<Dtype> temp_C_;    // temp_C_[C]
+  Blob<Dtype> temp_NC_;   // temp_NC_[N*C]
 };
 
 }  // namespace caffe

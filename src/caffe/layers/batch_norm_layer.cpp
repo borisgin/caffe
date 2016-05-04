@@ -143,7 +143,7 @@ void BatchNormLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       Dtype(1.), top_data);
   if (!use_global_stats_) {
     // compute variance E (X-EX)^2
-    caffe_powx(top_size, top_data, Dtype(2.), temp_.mutable_cpu_data());
+    caffe_sqr(top_size, top_data, temp_.mutable_cpu_data());
     compute_mean_per_channel_cpu(N, C, S, temp_.cpu_data(),
         variance_.mutable_cpu_data());
 
@@ -157,7 +157,7 @@ void BatchNormLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
       iter_++;
     if (iter_ > BN_VARIANCE_CLIP_START) {
       // clip from above
-      // temp_C_[c] = average_var + gobal_var[c]
+      // temp_C_[c] = average_var + global_var[c]
       Dtype y = caffe_cpu_asum(C, this->blobs_[3]->cpu_data());
       caffe_cpu_scale(C, Dtype(y/C), ones_C_.cpu_data(),
           temp_C_.mutable_cpu_data());
@@ -186,8 +186,9 @@ void BatchNormLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   }
   //  inv_var= (eps + variance)^(-0.5)
   caffe_add_scalar(C, eps_, variance_.mutable_cpu_data());
-  caffe_powx(C, variance_.cpu_data(), Dtype(-0.5),
-      inv_variance_.mutable_cpu_data());
+  caffe_sqrt(C, variance_.cpu_data(), inv_variance_.mutable_cpu_data());
+  caffe_div(C, ones_C_.cpu_data(), inv_variance_.cpu_data(),
+            inv_variance_.mutable_cpu_data());
   // X_norm = (X-EX) * inv_var
   multicast_cpu(N, C, S, inv_variance_.cpu_data(), temp_.mutable_cpu_data());
   caffe_mul(top_size, top_data, temp_.cpu_data(), top_data);
