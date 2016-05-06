@@ -53,7 +53,7 @@ class BatchNormLayer : public Layer<Dtype> {
   virtual inline int ExactNumBottomBlobs() const { return 1; }
   virtual inline int ExactNumTopBlobs() const { return 1; }
 
-  static const int BN_VARIANCE_CLIP_START = 200;
+  static const int   BN_WARMUP_PERIOD = 200;
   static const Dtype BN_VARIANCE_CLIP_CONST = 4.0;
 
  protected:
@@ -79,19 +79,17 @@ class BatchNormLayer : public Layer<Dtype> {
       const Dtype *x, Dtype *y);
 #endif
 
-  Blob<Dtype> mean_, variance_, inv_variance_, x_norm_;
-  bool use_global_stats_;
-  bool clip_variance_;
-  Dtype moving_average_fraction_;
-  int channels_;
-  Dtype eps_;
-  int iter_;
+  Blob<Dtype> batch_mean_, batch_variance_, mean_, variance_,
+              inv_variance_, x_norm_;
+  bool use_global_stats_, clip_variance_;
+  Dtype moving_average_fraction_, eps_;
+  int channels_, iter_;
   // arrays of ones
   Blob<Dtype> ones_N_, ones_HW_, ones_C_;  // ones[N], ones[H*W], ones[c]
   // auxiliary arrays
-  Blob<Dtype> temp_;      // temp_[N*C*H*W]
+  Blob<Dtype> temp_;      // temp_[N,C,H,W]
   Blob<Dtype> temp_C_;    // temp_C_[C]
-  Blob<Dtype> temp_NC_;   // temp_NC_[N*C]
+  Blob<Dtype> temp_NC_;   // temp_NC_[N,C]
 };
 
 }  // namespace caffe

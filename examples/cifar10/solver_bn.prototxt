@@ -1,6 +1,3 @@
-# reduce the learning rate after 8 epochs (4000 iters) by a factor of 10
-
-# The train/test net protocol buffer definition
 net: "examples/cifar10/train_bn.prototxt"
 # test_iter specifies how many forward passes the test should carry out.
 # In the case of CIFAR, we have test batch size 100 and 100 test iterations,

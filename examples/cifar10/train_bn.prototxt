@@ -82,9 +82,10 @@ layer {
   bottom: "pool1"
   top: "bn1"
   batch_norm_param {
-    moving_average_fraction: 0.9
+moving_average_fraction: 0.9 
     eps: 0.0001
     use_global_stats: false
+    clip_variance: true
     scale_filler {
       type: "constant"
       value: 1 
@@ -160,9 +161,10 @@ layer {
   bottom: "pool2"
   top: "bn2"
   batch_norm_param {
-    moving_average_fraction: 0.9
+    moving_average_fraction: 0.9 
     eps: 0.0001
     use_global_stats: false
+    clip_variance: true
     scale_filler {
       type: "constant"
       value: 1 
