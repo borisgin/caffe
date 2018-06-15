@@ -173,6 +173,29 @@ class AdamSolver : public SGDSolver<Dtype> {
   DISABLE_COPY_MOVE_AND_ASSIGN(AdamSolver);
 };
 
+/**
+
+ */
+template <typename Dtype>
+class LipschitzSolver : public SGDSolver<Dtype> {
+ public:
+  explicit LipschitzSolver(const SolverParameter& param,
+      size_t rank = 0U, Solver *root_solver = NULL)
+      : SGDSolver<Dtype>(param, rank, root_solver) { LipschitzPreSolve();}
+  explicit LipschitzSolver(const string& param_file,
+      size_t rank = 0U, Solver *root_solver = NULL)
+      : SGDSolver<Dtype>(param_file, rank, root_solver) { LipschitzPreSolve(); }
+  virtual inline const char* type() const { return "Lipschitz"; }
+
+ protected:
+  void LipschitzPreSolve();
+  float ComputeUpdateValue(int param_id, void* handle, float rate, bool clear_grads) override;
+  vector<float> local_rates_;
+  DISABLE_COPY_MOVE_AND_ASSIGN(LipschitzSolver);
+};
+
+
+
 }  // namespace caffe
 
 #endif  // CAFFE_SGD_SOLVERS_HPP_
