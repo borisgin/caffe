@@ -36,7 +36,7 @@ class SGDSolver : public Solver {
   void PreSolve();
   float GetMomentum();
   float GetWeightDecay() const;
-  float GetLocalRate(int param_id, float& wgrad_sq) const;
+  float GetLocalRate(int param_id, float& wgrad_sq) ;
   float local_decay(int param_id) const;
 
   float ApplyUpdate(int param_id, void* handle, float rate, bool normalize,
@@ -57,6 +57,11 @@ class SGDSolver : public Solver {
   // temp maintains other information that might be needed in computation
   //   of gradients/updates and is not needed in snapshots
   vector<shared_ptr<TBlob<Dtype> > > history_, update_, temp_;
+
+  vector<float> local_rates_;
+  vector<float> g_corr_;
+  vector<float> dw_dg_;
+  vector<float> dg_g_;
 
   DISABLE_COPY_MOVE_AND_ASSIGN(SGDSolver);
 };
@@ -173,9 +178,9 @@ class AdamSolver : public SGDSolver<Dtype> {
   DISABLE_COPY_MOVE_AND_ASSIGN(AdamSolver);
 };
 
-/**
+/*
 
- */
+*/
 template <typename Dtype>
 class LipschitzSolver : public SGDSolver<Dtype> {
  public:

@@ -9,16 +9,20 @@ namespace caffe {
 
 template<typename Dtype>
 __global__ void LipschitzRegUpdateAllAndClear(int N,
-		Dtype* g, Dtype *w,  Dtype* h_g, Dtype* h_w,
-        float rate,  bool clear_grads) {
+		Dtype* g, Dtype *w,
+		Dtype* h_g, Dtype* h_w,
+    float rate,  float decay,
+    bool reg_L2, bool clear_grads) {
   CUDA_KERNEL_LOOP(i, N) {
-    Dtype gr = g[i];
-    h_g[i] = gr;
+    h_g[i] = g[i];
     h_w[i] = w[i];
-    w[i] -=  gr * rate;
-    g[i] = clear_grads ? Dtype(0) : gr;
+    float reg = reg_L2 ? (float)w[i] : float((Dtype(0.F) < w[i]) - (w[i] < Dtype(0.F)));
+    float gr = float(g[i]) + reg * decay;
+    w[i] -=  (Dtype) (gr * rate);
+    g[i] = clear_grads ? Dtype(0) : g[i];
   }
 }
+
 #pragma clang diagnostic pop
 
 /*
@@ -50,22 +54,27 @@ __global__ void LipschitzRegUpdateAllAndClear<half, half>(int N,
 */
 
 template<typename Dtype>
-void Lipschitz_update_and_clear_gpu(int N,
+void Lipschitz_reg_update_and_clear_gpu(int N,
   Dtype* g,    Dtype *w,  Dtype* h_g,  Dtype* h_w,
-  float rate,  void *handle, bool clear_grads) {
+  float rate, const std::string& reg_type, float decay,
+  void *handle, bool clear_grads) {
   cublasHandle_t cublas_handle =
       handle == nullptr ? Caffe::cublas_handle(0) : reinterpret_cast<cublasHandle_t>(handle);
   cudaStream_t stream;
   CUBLAS_CHECK(cublasGetStream(cublas_handle, &stream));
   LipschitzRegUpdateAllAndClear  // NOLINT_NEXT_LINE(whitespace/operators)
       <<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS, 0, stream>>>(N,
-      g, w, h_g, h_w, rate, clear_grads);
+      g, w, h_g, h_w, rate, decay, reg_type == "L2",
+      clear_grads);
   CUDA_POST_KERNEL_CHECK;
   CUDA_CHECK(cudaStreamSynchronize(stream));
 }
 
-template void Lipschitz_update_and_clear_gpu<float16>(int, float16*, float16*, float16*, float16*, float, void*, bool);
-template void Lipschitz_update_and_clear_gpu<float>(int,   float*,   float*, float*, float*,       float, void*, bool);
-template void Lipschitz_update_and_clear_gpu<double>(int,  double*,  double*, double*, double*,    float, void*, bool);
+template void Lipschitz_reg_update_and_clear_gpu<float16>(int, float16*, float16*, float16*, float16*, float,
+    const std::string&, float, void*, bool);
+template void Lipschitz_reg_update_and_clear_gpu<float>(int,   float*,   float*, float*, float*, float,
+    const std::string&, float, void*, bool);
+template void Lipschitz_reg_update_and_clear_gpu<double>(int,  double*,  double*, double*, double*, float,
+    const std::string&, float, void*, bool);
 
 }  // namespace caffe

@@ -424,10 +424,12 @@ message SolverParameter {
   optional float momentum_power   = 48 [default = 1.];
   
   // LARC - Layer-wise Adaptive Rate Control
+
   optional bool larc = 49 [default = false]; 
   optional string larc_policy = 50 [default = "scale"];
   optional float  larc_eta = 51    [default = 0.001];
-  
+  optional bool turbo = 55 [default = false]; 
+    
   optional float  weight_decay = 12; // The weight decay.  
   optional string weight_decay_policy = 52 [default = "fixed"]; 
   optional float  weight_decay_power  = 53 [default = 0.5];
