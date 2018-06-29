@@ -1,4 +1,12 @@
-name: "AlexNet_fp32_base"
+name: "AlexNet_B8k_fp16"
+
+default_forward_type:  FLOAT16
+default_backward_type: FLOAT16
+default_forward_math:  FLOAT16
+default_backward_math: FLOAT16
+
+global_grad_scale: 1000.
+global_grad_scale_adaptive: True
 
 layer {
   name: "data"
@@ -12,7 +20,7 @@ layer {
   }
   data_param {
     source: "examples/imagenet/ilsvrc12_train_lmdb"
-    batch_size: 1024
+    batch_size: 8192
     cache: true
     shuffle: true
     backend: LMDB
@@ -52,7 +60,7 @@ layer {
     }
     bias_filler {
       type: "constant"
-      value: 0
+      value: 0.0
     }
   }
 }
@@ -100,7 +108,7 @@ layer {
     }
     bias_filler {
       type: "constant"
-      value: 0.1
+      value: 0.0
     }
   }
 }
@@ -147,7 +155,7 @@ layer {
     }
     bias_filler {
       type: "constant"
-      value: 0
+      value: 0.0
     }
   }
 }
@@ -173,7 +181,7 @@ layer {
     }
     bias_filler {
       type: "constant"
-      value: 0.1
+      value: 0.0
     }
   }
 }
@@ -199,7 +207,7 @@ layer {
     }
     bias_filler {
       type: "constant"
-      value: 0.1
+      value: 0.0
     }
   }
 }
@@ -233,7 +241,7 @@ layer {
     }
     bias_filler {
       type: "constant"
-      value: 0.1
+      value: 0.0
     }
   }
 }
@@ -265,7 +273,7 @@ layer {
     }
     bias_filler {
       type: "constant"
-      value: 0.1
+      value: 0.0
     }
   }
 }
@@ -297,7 +305,7 @@ layer {
     }
     bias_filler {
       type: "constant"
-      value: 0
+      value: 0.0
     }
   }
 }

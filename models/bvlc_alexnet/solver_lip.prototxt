@@ -9,22 +9,22 @@ display:  25
 max_iter: 15600
 
 #rampup_interval : 2500
-#rampup_lr :0.02;
+#rampup_lr :0.04;
 
-base_lr: 0.5       # B=1024
-#min_lr:  1.e-5
-lr_policy:  "poly" #"fixed" 
+base_lr: 0.5      # B=1024
+min_lr:  1.e-5
+lr_policy: "poly" #"fixed"
 power: 2
 
 larc: true
-turbo: true
+larc_turbo: true
 larc_policy: "clip"
 larc_eta: 0.05
 
-momentum: 0.95
-#max_momentum: 0.95
-#momentum_policy: "poly"
-#momentum_power: 1
+momentum: 0.9
+max_momentum: 0.95
+momentum_policy: "poly"
+momentum_power: 1
 
 weight_decay: 0.0005
 #weight_decay_policy: "poly"  
@@ -35,6 +35,7 @@ snapshot_prefix: "models/bvlc_alexnet/snapshots/alexnet_fp32"
 snapshot_after_train: false
 
 solver_mode: GPU
+solver_data_type: FLOAT16
 #type: "Lipschitz"
 
 random_seed: 1

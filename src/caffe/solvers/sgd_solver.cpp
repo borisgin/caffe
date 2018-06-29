@@ -188,8 +188,17 @@ void SGDSolver<Dtype>::PrintRate(float rate) {
     }
     float moment = GetMomentum();
     float wd = GetWeightDecay();
-    LOG(INFO) << "Iteration " << this->iter_ << ", lr = " << rate << ", m = " << moment
-              << ", wd = " << wd  << ", gs = " << f_round2(net_->global_grad_scale());
+    if (this->param_.larc()) {
+     float larc_eta = this->param_.larc_eta();
+     LOG(INFO) << "Iteration " << this->iter_ << ", lr = " << rate << ", m = " << moment
+               << ", wd = " << wd  << ", gs = " << f_round2(net_->global_grad_scale())
+               << ", eta ="  <<larc_eta
+               ;
+    } else {
+      LOG(INFO) << "Iteration " << this->iter_ << ", lr = " << rate << ", m = " << moment
+              << ", wd = " << wd  << ", gs = " << f_round2(net_->global_grad_scale())
+              ;
+    }
   }
 }
 
@@ -347,18 +356,19 @@ float SGDSolver<Dtype>::GetLocalRate(int param_id, float& wgrad_sq)  {
       if (std::isnan(wgrad_sq)) {
         LOG(INFO) << "LARC: nan";
       }
-      const float gw_ratio = this->param_.larc_eta();
+      const float larc_eta = this->param_.larc_eta();
       float rate = 1.F;
       if (w_norm > 0.F && wgrad_norm > 0.F) {
         //rate = gw_ratio * w_norm / (wgrad_norm + weight_decay * w_norm);
-        rate = (1.0 - momentum)* gw_ratio * w_norm /wgrad_norm ;
+        rate = (1.0 - momentum)* larc_eta * w_norm /wgrad_norm ;
       }
       if (local_lr > 0.) {
         local_lr = rate;
       }
- //     if (this->param_.turbo())
-      {
+
+      if (this->param_.larc_turbo())  {
         TBlob<Dtype>* prev = this->temp_[param_id].get();
+        TBlob<Dtype>* hist = this->history_[param_id].get();
         const int N = param->count();
         const float beta =  0.95;
         //------- booster------------------------------------------------------
@@ -374,14 +384,29 @@ float SGDSolver<Dtype>::GetLocalRate(int param_id, float& wgrad_sq)  {
 
           //---- (g(t+1)*g(t))/(|g(t+1)|*|g(t)|) ----
           float g1_go_corr = 0;
-          if ((dw_norm > 0.) && (g1_norm >0) && (g0_norm >0)) {
-            g1_go_corr = g1_go_dot / (g0_norm* g1_norm);
+//          if ((dw_norm > 0.) && (g1_norm >0) && (g0_norm >0)) {
+//            g1_go_corr = g1_go_dot / (g0_norm* g1_norm);
+//          }
+//          if (g_corr_[param_id]==0.) {
+//            g_corr_[param_id]= g1_go_corr;
+//          } else {
+//            g_corr_[param_id]= beta * g_corr_[param_id] + (1.-beta) * g1_go_corr;
+//          }
+
+          //---------------------------------------
+          float g_m_dot;
+          caffe_gpu_dot<Dtype>(N,param->gpu_diff<Dtype>(),  hist->gpu_data(), &g_m_dot);
+          float m_norm=std::sqrt(hist->sumsq_data(type_id));
+          if ((dw_norm > 0.) && (g1_norm > 0.) && (m_norm > 0.)) {
+             g1_go_corr = g_m_dot  / (g1_norm *m_norm);
+ //            g_corr_[param_id]= g1_go_corr;
           }
           if (g_corr_[param_id]==0.) {
             g_corr_[param_id]= g1_go_corr;
           } else {
             g_corr_[param_id]= beta * g_corr_[param_id] + (1.-beta) * g1_go_corr;
           }
+
           //---- (w(t+1)-w(t))/(g(t+1)-g(t)) ----
           float dw_dg = 1.;
           if ((dw_norm > 0.) && (dg_norm > 0.)) {
@@ -403,26 +428,43 @@ float SGDSolver<Dtype>::GetLocalRate(int param_id, float& wgrad_sq)  {
             dg_g_[param_id]= beta * dg_g_[param_id] + (1.-beta) * dg_g;
           }
 
-        } // end of if (iter >1)
-
+        }
         //------- save current w and grad --------------------------------------
         caffe_copy<Dtype>(N, param->gpu_data<Dtype>(), prev->mutable_gpu_data());
         caffe_copy<Dtype>(N, param->gpu_diff<Dtype>(), prev->mutable_gpu_diff());
-        float boost_factor = 1;
         if (local_lr > 0.) {
-          if (this->iter_> 10) {
-            boost_factor = 1. + g_corr_[param_id];
-//            if (g_corr_[param_id]  < 0. ) {
-//              boost_factor = 0.5;
-//            } else if (g_corr_[param_id] > 0.1 ) {
-//              boost_factor = 2.0;
-//            }
-//            if (dw_dg_[param_id] > 5. ) {
-//              boost_factor = 0.5 / dw_dg_[param_id] ;
-//            }
-            if (this->param_.turbo())
-              local_lr = local_lr* boost_factor;
-         }
+          if (this->iter_> 2) {
+            if (this->param_.larc_turbo()) {
+              float boost = 1. - 0.9 * g_corr_[param_id];
+              local_lr = local_lr * boost;
+            }
+          }
+
+
+/*
+              //--- normalzied g1_g0_corr--------------------
+//              float boost_factor = 1. + g_corr_[param_id];
+//              local_lr = local_lr* boost_factor;
+
+              float lr2_rate= 0.0005;
+              float boost_lr = local_rates_[param_id] - lr2_rate * g_corr_[param_id];
+
+//              float boost_lr;
+//              float delta=0.001F
+//              if (g_corr_[param_id]>0)
+//                boost_lr = local_rates_[param_id] + delta;
+//              else
+//                boost_lr = local_rates_[param_id] - delta;
+
+              boost_lr= std::max(boost_lr, 0.1F * local_lr );
+              local_lr = std::min(2.F * local_lr, boost_lr);
+              //local_rates_[param_id] = boost_lr;
+              //local_lr = boost_lr;
+            }
+          }
+*/
+
+          local_rates_[param_id] = local_lr;
 
 //#ifdef DEBUG
           if (Caffe::root_solver() && this->param_.display()
@@ -430,12 +472,12 @@ float SGDSolver<Dtype>::GetLocalRate(int param_id, float& wgrad_sq)  {
                && (local_lr>0)) {
              //using namespace std;
              LOG(INFO) << std::setw(2) << param_id
-                  << " lr="      << std::fixed << std::setprecision(6) << local_lr
-                  << "  g_corr=" << std::fixed << std::setprecision(2) << g_corr_[param_id]
-                  << "\t  dw_dg="  << dw_dg_[param_id]
-                  << "  dg_g="   << std::fixed << std::setprecision(6) << dg_g_[param_id]
-                  << "  w="      << w_norm
-                  << "  g="        << wgrad_norm
+                  << " lr="       << std::fixed << std::setprecision(6) << local_lr
+                  << "  g_corr="  << std::fixed << std::setprecision(6) << g_corr_[param_id]
+                  << "\t  dw_dg=" << std::fixed << std::setprecision(6) << dw_dg_[param_id]
+                  << "  dg_g="    <<  dg_g_[param_id]
+                  << "  w="       << w_norm
+                  << "  g="       << wgrad_norm
                  ;
           }
 //#endif
