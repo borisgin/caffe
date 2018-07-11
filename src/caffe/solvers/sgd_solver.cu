@@ -30,7 +30,7 @@ __global__ void SGDWdUpdateAllAndClear<half, half, half>(int N,
   half* g, half* w, half* h,
     float momentum, float local_rate, float local_decay, bool clear_grads) {
   half hz;
-  float wd = local_decay * local_rate;
+  float wd = local_decay * local_rate / (1.F-momentum);
   CUDA_KERNEL_LOOP(i, N) {
     float wf = __half2float(w[i]);
     float hf = momentum * __half2float(h[i])  + local_rate * __half2float(g[i]);
