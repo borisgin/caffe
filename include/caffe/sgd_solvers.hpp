@@ -199,6 +199,23 @@ class LipschitzSolver : public SGDSolver<Dtype> {
   DISABLE_COPY_MOVE_AND_ASSIGN(LipschitzSolver);
 };
 
+template <typename Dtype>
+class SAGSolver : public SGDSolver<Dtype> {
+ public:
+  explicit SAGSolver(const SolverParameter& param,
+      size_t rank = 0U, Solver *root_solver = NULL)
+      : SGDSolver<Dtype>(param, rank, root_solver) { }
+  explicit SAGSolver(const string& param_file,
+      size_t rank = 0U, Solver *root_solver = NULL)
+      : SGDSolver<Dtype>(param_file, rank, root_solver) {  }
+  virtual inline const char* type() const { return "SAG"; }
+
+ protected:
+  float ComputeUpdateValue(int param_id, void* handle, float rate, bool clear_grads) override;
+  float GetLocalRate(int param_id, float& wgrad_sq);
+  DISABLE_COPY_MOVE_AND_ASSIGN(SAGSolver);
+};
+
 
 
 }  // namespace caffe

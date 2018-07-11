@@ -434,7 +434,7 @@ message SolverParameter {
   optional string weight_decay_policy = 52 [default = "fixed"]; 
   optional float  weight_decay_power  = 53 [default = 0.5];
   
-  // regularization types supported: L1 and L2
+  // regularization types supported: L1, L2, WD
   // controlled by weight_decay
   optional string regularization_type = 29 [default = "L2"];
   // the stepsize for learning rate policy "step"
@@ -498,7 +498,8 @@ message SolverParameter {
     RMSPROP = 3;
     ADADELTA = 4;
     ADAM = 5;
-    LIPSCHITZ =6;
+    SAG = 6;
+    LIPSCHITZ = 7;
   }
   // DEPRECATED: use type instead of solver_type
   optional SolverType solver_type = 30 [default = SGD];

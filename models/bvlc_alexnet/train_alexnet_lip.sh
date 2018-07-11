@@ -2,4 +2,6 @@
 
 ./build/tools/caffe train \
     --solver=models/bvlc_alexnet/solver_lip.prototxt -gpu=all \
-    2>&1 | tee models/bvlc_alexnet/logs/alexnet_larc_B8k_lr0.5p2_wd0.0005_m0.9_0.95_100e_eta0.05_fp16.log
+    2>&1 | tee models/bvlc_alexnet/logs/alexnet_larct_l2_B16k_lr3.5p2_wd0.0005_m0.9_0.96_eta0.064_fp32.log
+
+# --snapshot=models/bvlc_alexnet/snapshots/alexnet_B16K_4000_iter_4000.solverstate \

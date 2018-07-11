@@ -300,6 +300,7 @@ float SGDSolver<Dtype>::ComputeUpdateValue(int param_id, void* handle, float rat
     float decay = local_decay(param_id);
     const Type wtype = param->data_type();
     const Type gtype = param->diff_type();
+
     if (gtype == tp<float16>()) {
       sgd_reg_update_all_and_clear_gpu<float16, Dtype, Dtype>(param->count(),
           param->mutable_gpu_diff<float16>(),
@@ -359,20 +360,22 @@ float SGDSolver<Dtype>::GetLocalRate(int param_id, float& wgrad_sq)  {
       const float larc_eta = this->param_.larc_eta();
       float rate = 1.F;
       if (w_norm > 0.F && wgrad_norm > 0.F) {
-        //rate = gw_ratio * w_norm / (wgrad_norm + weight_decay * w_norm);
-        rate = (1.0 - momentum)* larc_eta * w_norm /wgrad_norm ;
+          //rate = larc_eta * w_norm / (wgrad_norm + weight_decay * w_norm);
+        //rate =  larc_eta * w_norm /wgrad_norm ;
+         rate = (1.0 - momentum)* larc_eta * w_norm /wgrad_norm ;
       }
       if (local_lr > 0.) {
         local_lr = rate;
       }
-
+      float m_norm = 0;
       if (this->param_.larc_turbo())  {
         TBlob<Dtype>* prev = this->temp_[param_id].get();
         TBlob<Dtype>* hist = this->history_[param_id].get();
         const int N = param->count();
         const float beta =  0.95;
         //------- booster------------------------------------------------------
-        if (this->iter_ > 1) {
+        //if (this->iter_ > 1)
+        {
           float g1_go_dot;
           caffe_gpu_dot<Dtype>(N,param->gpu_diff<Dtype>(),  prev->gpu_diff(), &g1_go_dot );
           float g1_norm = wgrad_norm; //std::sqrt(param->sumsq_diff(type_id));
@@ -396,7 +399,7 @@ float SGDSolver<Dtype>::GetLocalRate(int param_id, float& wgrad_sq)  {
           //---------------------------------------
           float g_m_dot;
           caffe_gpu_dot<Dtype>(N,param->gpu_diff<Dtype>(),  hist->gpu_data(), &g_m_dot);
-          float m_norm=std::sqrt(hist->sumsq_data(type_id));
+          m_norm=std::sqrt(hist->sumsq_data(type_id));
           if ((dw_norm > 0.) && (g1_norm > 0.) && (m_norm > 0.)) {
              g1_go_corr = g_m_dot  / (g1_norm *m_norm);
  //            g_corr_[param_id]= g1_go_corr;
@@ -473,11 +476,12 @@ float SGDSolver<Dtype>::GetLocalRate(int param_id, float& wgrad_sq)  {
              //using namespace std;
              LOG(INFO) << std::setw(2) << param_id
                   << " lr="       << std::fixed << std::setprecision(6) << local_lr
-                  << "  g_corr="  << std::fixed << std::setprecision(6) << g_corr_[param_id]
+                  << " g_corr="  << std::fixed << std::setprecision(6) << g_corr_[param_id]
                   << "\t  dw_dg=" << std::fixed << std::setprecision(6) << dw_dg_[param_id]
-                  << "  dg_g="    <<  dg_g_[param_id]
-                  << "  w="       << w_norm
-                  << "  g="       << wgrad_norm
+                  << " dg_g="    <<  dg_g_[param_id]
+                  << " w="       << w_norm
+                  << " g="       << wgrad_norm
+                  << " m="       << m_norm
                  ;
           }
 //#endif
