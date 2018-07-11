@@ -7,7 +7,7 @@ test_initialization: false
 display:  15 #125 #15 #
 
 max_iter: 8580 # 110 e15600 #125000 # 
-iter_size: 2
+#iter_size: 2
 
 #rampup_interval : 2500
 #rampup_lr :0.04;
@@ -37,7 +37,7 @@ snapshot_after_train: false
 
 solver_mode: GPU
 #type: "SAG"
-#regularization_type: "WD"
+regularization_type: "WD"
 #solver_data_type: FLOAT16
 random_seed: 1
 
