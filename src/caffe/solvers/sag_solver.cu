@@ -7,33 +7,27 @@
 #pragma ide diagnostic ignored "CannotResolve"
 namespace caffe {
 
+//TODO: add Htype to support solver fp16 mode
+
 template<typename Dtype>
 __global__ void SAGRegUpdateAllAndClear(int N,
     Dtype* g, Dtype *w, Dtype* h,
     float momentum, float rate,  float decay, bool clear_grads) {
-    float m1 = 1.F - momentum;
-    Dtype dz = Dtype(0.);
+  float m1 = 1.F - momentum;
 
   CUDA_KERNEL_LOOP(i, N) {
-    /*
-    float hf = momentum * float(h[i]) + m1 * (float(g[i]) + decay*float(w[i]));
- //   h[i] -=  (1.F- momentum) * (g[i] - h[i]);
-    h[i]=Dtype(hf);
-    w[i] -= Dtype(rate * hf);
-    if (clear_grads)
-      g[i] = Dtype(0.);
-    */
     float wf = w[i];
     float gf = g[i];
     float hf = h[i];
+
     hf = momentum * hf + m1 * (gf + decay * wf);
-    wf = wf - rate * hf;
+    wf -= rate * hf;
    // h[i] -= (1.F - momentum) * (g[i] + decay*w[i] - h[i]);
 
-    h[i] = Dtype(hf);
     w[i] = Dtype(wf);
+    h[i] = Dtype(hf);
     if (clear_grads) {
-      g[i] = dz;
+      g[i] = Dtype(0);
     }
   }
 }
@@ -51,26 +45,34 @@ __global__ void SAGRegUpdateAllAndClear<half>(int N,
     float hf = __half2float(h[i]);
 
     hf = momentum * hf + m1 * (gf + decay * wf);
-   // hf -= (1.F - momentum) * (gf + decay*wf - hf);
     wf -= rate * hf;
 
-    h[i] = float2half_clip(hf);
     w[i] = float2half_clip(wf);
+    h[i] = float2half_clip(hf);
     if (clear_grads) {
-         g[i] = hz;
+      g[i] = hz;
     }
   }
 }
 
+//==================================================================
 
 template<typename Dtype>
-__global__ void SAGWdUpdateAllAndClear(int N, Dtype* g, Dtype *w, Dtype* h,
+__global__ void SAGWdUpdateAllAndClear(int N,
+    Dtype* g, Dtype *w, Dtype* h,
 		float momentum, float rate,  float decay, bool clear_grads) {
   float m1 = 1.F - momentum;
+
   CUDA_KERNEL_LOOP(i, N) {
-    h[i] = Dtype(momentum * h[i] + m1 * g[i]);
- //   h[i] -=  (1.F- momentum) * (g[i] - h[i]);
-    w[i] -= Dtype(rate * (float(h[i]) + decay*float(w[i])));
+    float wf = w[i];
+    float gf = g[i];
+    float hf = h[i];
+
+    hf = momentum * hf + m1 * gf;
+    wf -= rate * (hf + decay*wf);
+
+    w[i]= Dtype(wf);
+    h[i] = Dtype(hf);
     if (clear_grads) {
       g[i] = Dtype(0.);
     }
@@ -88,7 +90,6 @@ __global__ void SAGWdUpdateAllAndClear<half>(int N,
     float hf = __half2float(h[i]);
 
     hf = momentum * hf + (1.F- momentum) * gf;
-   // hf -= (1.F - momentum) * (gf - hf);
     wf-= rate * (hf + decay*wf);
 
     h[i] = float2half_clip(hf);
@@ -113,12 +114,12 @@ void SAG_reg_update_and_clear_gpu(int N,
   CUBLAS_CHECK(cublasGetStream(cublas_handle, &stream));
   if (reg_type == "L2") {
     SAGRegUpdateAllAndClear  // NOLINT_NEXT_LINE(whitespace/operators)
-      <<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS, 0, stream>>>(N,
-      g, w, h, momentum, rate, decay, clear_grads);
+         <<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS, 0, stream>>>(N,
+           g, w, h, momentum, rate, decay, clear_grads);
   } else if (reg_type == "WD") {
     SAGWdUpdateAllAndClear  // NOLINT_NEXT_LINE(whitespace/operators)
          <<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS, 0, stream>>>(N,
-         g, w, h, momentum, rate, decay, clear_grads);
+           g, w, h, momentum, rate, decay, clear_grads);
   } else {
     LOG(FATAL) << "Unknown regularization mode: " << reg_type;
   }

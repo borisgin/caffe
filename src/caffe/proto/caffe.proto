@@ -431,8 +431,9 @@ message SolverParameter {
   optional bool larc_turbo = 55 [default = false]; 
     
   optional float  weight_decay = 12; // The weight decay.  
-  optional string weight_decay_policy = 52 [default = "fixed"]; 
-  optional float  weight_decay_power  = 53 [default = 0.5];
+  optional string weight_decay_policy = 52 [default = "fixed"];
+  optional float  weight_decay_power  = 53 [default = 1.0];
+  optional float  max_weight_decay  = 57; 
   
   // regularization types supported: L1, L2, WD
   // controlled by weight_decay
