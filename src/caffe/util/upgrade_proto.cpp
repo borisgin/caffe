@@ -1024,6 +1024,9 @@ bool UpgradeSolverType(SolverParameter* solver_param) {
     case SolverParameter_SolverType_ADAM:
       type = "Adam";
       break;
+    case SolverParameter_SolverType_SAG:
+      type = "SAG";
+      break;
     default:
       LOG(FATAL) << "Unknown SolverParameter solver_type: " << type;
     }

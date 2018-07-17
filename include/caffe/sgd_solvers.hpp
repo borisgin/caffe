@@ -36,13 +36,14 @@ class SGDSolver : public Solver {
   void PreSolve();
   float GetMomentum();
   float GetWeightDecay() const;
-  float GetLocalRate(int param_id, float& wgrad_sq) ;
   float local_decay(int param_id) const;
 
   float ApplyUpdate(int param_id, void* handle, float rate, bool normalize,
       bool clear_grads) override;
   void Normalize(int param_id, void* handle);
   void Regularize(int param_id);
+
+  virtual float GetLocalRate(int param_id, float& wgrad_sq) ;
 
   virtual float ComputeUpdateValue(int param_id, void* handle, float rate, bool clear_grads);
   virtual void SnapshotSolverState(const string& model_filename);
@@ -212,7 +213,7 @@ class SAGSolver : public SGDSolver<Dtype> {
 
  protected:
   float ComputeUpdateValue(int param_id, void* handle, float rate, bool clear_grads) override;
-  float GetLocalRate(int param_id, float& wgrad_sq);
+  float GetLocalRate(int param_id, float& wgrad_sq) override;
   DISABLE_COPY_MOVE_AND_ASSIGN(SAGSolver);
 };
 

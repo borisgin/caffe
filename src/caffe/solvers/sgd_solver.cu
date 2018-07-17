@@ -8,38 +8,35 @@ namespace caffe {
 
 template<typename Gtype, typename Wtype, typename Htype>
 __global__ void SGDWdUpdateAllAndClear(int N,
-  Gtype* g, Wtype* w, Htype* h,
+    Gtype* g, Wtype* w, Htype* h,
     float momentum, float local_rate, float local_decay, bool clear_grads) {
-  float wd = local_decay * local_rate ;/// (1.F-momentum);
-
+  float wd = local_decay * local_rate;
   CUDA_KERNEL_LOOP(i, N) {
     float wf =  float(w[i]);
     float hf = momentum * float(h[i]) + local_rate * float(g[i]);
-    wf =  wf- (hf + wd * wf);
-
+    wf -= hf + wd * wf;
     h[i] = Htype(hf);
     w[i] = Wtype(wf);
     if (clear_grads) {
-      g[i] =  Gtype(0.);
+      g[i] = Gtype(0);
     }
   }
 }
 
 template<>
 __global__ void SGDWdUpdateAllAndClear<half, half, half>(int N,
-  half* g, half* w, half* h,
+    half* g, half* w, half* h,
     float momentum, float local_rate, float local_decay, bool clear_grads) {
   half hz;
-  float wd = local_decay * local_rate ; /// (1.F-momentum);
+  float wd = local_decay * local_rate;
   CUDA_KERNEL_LOOP(i, N) {
     float wf = __half2float(w[i]);
     float hf = momentum * __half2float(h[i])  + local_rate * __half2float(g[i]);
-    wf =  wf- (hf + wd * wf);
-
+    wf -= hf + wd * wf;
     h[i] = float2half_clip(hf);
     w[i] = float2half_clip(wf);
     if (clear_grads) {
-      g[i] =  hz;
+      g[i] = hz;
     }
   }
 }
@@ -48,19 +45,34 @@ template<>
 __global__ void SGDWdUpdateAllAndClear<float, float, half>(int N,
     float* g, float* w, half* h,
     float momentum, float local_rate, float local_decay, bool clear_grads) {
-  float wd = local_decay * local_rate ; /// (1.F-momentum);
+  float wd = local_decay * local_rate;
   CUDA_KERNEL_LOOP(i, N) {
     float wf = w[i];
-    float hf = momentum * __half2float(h[i])  + local_rate * g[i];
-    w[i] -=  (hf + wd * wf);
+    float hf = momentum * __half2float(h[i]) + local_rate * g[i];
+    w[i] -= hf + wd * wf;
     h[i] = float2half_clip(hf);
     if (clear_grads) {
       g[i] = 0.F;
     }
   }
 }
-//------------------------------------------------------------------------------------
 
+template<>
+__global__ void SGDWdUpdateAllAndClear<float, half, half>(int N,
+    float* g, half* w, half* h,
+    float momentum, float local_rate, float local_decay, bool clear_grads) {
+  float wd = local_decay * local_rate;
+  CUDA_KERNEL_LOOP(i, N) {
+    float wf = __half2float(w[i]);
+    float hf = momentum * __half2float(h[i]) + local_rate * g[i];
+    wf -= hf + wd * wf;
+    w[i] = float2half_clip(wf);
+    h[i] = float2half_clip(hf);
+    if (clear_grads) {
+      g[i] = 0.F;
+    }
+  }
+}
 
 template<typename Gtype, typename Wtype, typename Htype>
 __global__ void SGDRegUpdateAllAndClear(int N,
@@ -72,8 +84,9 @@ __global__ void SGDRegUpdateAllAndClear(int N,
     h[i] = momentum * h[i] + local_rate * gr;
     gr = h[i];
     w[i] -= gr;
-    g[i] = Gtype(0);
-   // g[i] = clear_grads ? Gtype(0) : Gtype(gr);
+    if (clear_grads) {
+      g[i] = Gtype(0);
+    }
   }
 }
 
@@ -86,16 +99,16 @@ __global__ void SGDRegUpdateAllAndClear<half, half, half>(int N,
     float wf = __half2float(w[i]);
     float gf = __half2float(g[i]);
     float hf = __half2float(h[i]);
-
     float reg = reg_L2 ? wf : float((0.F < wf)-(wf < 0.F));
     gf += reg * local_decay;
     hf = momentum * hf  + local_rate * gf;
     gf = hf;
     wf -= gf;
-
     h[i] = float2half_clip(hf);
     w[i] = float2half_clip(wf);
-    g[i] = clear_grads ? hz : float2half_clip(gf);
+    if (clear_grads) {
+      g[i] = hz;
+    }
   }
 }
 
@@ -108,15 +121,15 @@ __global__ void SGDRegUpdateAllAndClear<float, float, half>(int N,
     float wf = w[i];
     float gf = g[i];
     float hf = __half2float(h[i]);
-
     float reg = reg_L2 ? wf : float((0.F < wf)-(wf < 0.F));
     gf += reg * local_decay;
     gf = hf = momentum * hf  + local_rate * gf;
     wf -= gf;
-
     h[i] = float2half_clip(hf);
     w[i] = wf;
-    g[i] = clear_grads ? 0.F : gf;
+    if (clear_grads) {
+      g[i] = 0.F;
+    }
   }
 }
 
@@ -130,7 +143,9 @@ __global__ void SGDRegUpdateAllAndClear<half, float, float>(int N,
     float gr = __half2float(g[i]) + reg * local_decay;
     gr = h[i] = momentum * h[i] + local_rate * gr;
     w[i] -= gr;
-    g[i] = clear_grads ? hz : float2half_clip(h[i]);
+    if (clear_grads) {
+      g[i] = hz;
+    }
   }
 }
 
@@ -160,38 +175,36 @@ void sgd_reg_update_all_and_clear_gpu(int N,
   CUDA_CHECK(cudaStreamSynchronize(stream));
 }
 
-template void sgd_reg_update_all_and_clear_gpu<float16, double, double>(
-    int, float16*, double*, double*,
-  float, float, const std::string&, float,  void*, bool);
-template void sgd_reg_update_all_and_clear_gpu<float, float, float>(
-    int, float*, float*, float*,
-  float, float, const std::string&, float,  void*, bool);
-template void sgd_reg_update_all_and_clear_gpu<float, double, double>(
-    int, float*, double*, double*,
-  float, float, const std::string&, float,  void*, bool);
+template void sgd_reg_update_all_and_clear_gpu<float16, double, double>(int,
+    float16*, double*, double*,
+    float, float, const std::string&, float,  void*, bool);
+template void sgd_reg_update_all_and_clear_gpu<float, float, float>(int,
+    float*, float*, float*,
+    float, float, const std::string&, float,  void*, bool);
+template void sgd_reg_update_all_and_clear_gpu<float, double, double>(int,
+    float*, double*, double*,
+    float, float, const std::string&, float,  void*, bool);
 template void sgd_reg_update_all_and_clear_gpu<float, float16, float16>(
     int, float*, float16*, float16*,
-  float, float, const std::string&, float,  void*, bool);
-template void sgd_reg_update_all_and_clear_gpu<double, float, float>(
-    int, double*, float*, float*,
-  float, float, const std::string&, float,  void*, bool);
-template void sgd_reg_update_all_and_clear_gpu<double, double, double>(
-    int, double*, double*, double*,
-  float, float, const std::string&, float,  void*, bool);
-template void sgd_reg_update_all_and_clear_gpu<double, float16, float16>(
-    int, double*, float16*, float16*,
-  float, float, const std::string&, float,  void*, bool);
-
-template void sgd_reg_update_all_and_clear_gpu<float, float, float16>(
-    int, float*, float*, float16*,
     float, float, const std::string&, float,  void*, bool);
-template void sgd_reg_update_all_and_clear_gpu<float, float, double>(
-    int, float*, float*, double*,
+template void sgd_reg_update_all_and_clear_gpu<double, float, float>(int,
+    double*, float*, float*,
+    float, float, const std::string&, float,  void*, bool);
+template void sgd_reg_update_all_and_clear_gpu<double, double, double>(int,
+    double*, double*, double*,
+    float, float, const std::string&, float,  void*, bool);
+template void sgd_reg_update_all_and_clear_gpu<double, float16, float16>(int,
+    double*, float16*, float16*,
+    float, float, const std::string&, float,  void*, bool);
+template void sgd_reg_update_all_and_clear_gpu<float, float, float16>(int,
+    float*, float*, float16*,
+    float, float, const std::string&, float,  void*, bool);
+template void sgd_reg_update_all_and_clear_gpu<float, float, double>(int,
+    float*, float*, double*,
     float, float, const std::string&, float,  void*, bool);
 
 template<>
-void
-sgd_reg_update_all_and_clear_gpu<float16, float16>(int N,
+void sgd_reg_update_all_and_clear_gpu<float16, float16, float16>(int N,
   float16* g, float16* w, float16* h,
   float momentum, float local_rate, const std::string& reg_type, float local_decay,
   void* handle, bool clear_grads) {
@@ -202,14 +215,13 @@ sgd_reg_update_all_and_clear_gpu<float16, float16>(int N,
   // NOLINT_NEXT_LINE(whitespace/operators)
   SGDRegUpdateAllAndClear<<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS, 0, stream>>> (N,
       reinterpret_cast<half*>(g), reinterpret_cast<half*>(w), reinterpret_cast<half*>(h),
-      momentum, local_rate, local_decay, reg_type == "L2",  clear_grads);
+      momentum, local_rate, local_decay, reg_type == "L2", clear_grads);
   CUDA_POST_KERNEL_CHECK;
   CUDA_CHECK(cudaStreamSynchronize(stream));
 }
 
 template<>
-void
-sgd_reg_update_all_and_clear_gpu<float16, float>(int N,
+void sgd_reg_update_all_and_clear_gpu<float16, float, float>(int N,
     float16* g, float* w, float* h,
     float momentum,  float local_rate, const std::string& reg_type, float local_decay,
     void* handle, bool clear_grads) {
@@ -218,9 +230,9 @@ sgd_reg_update_all_and_clear_gpu<float16, float>(int N,
   cudaStream_t stream;
   CUBLAS_CHECK(cublasGetStream(cublas_handle, &stream));
   // NOLINT_NEXT_LINE(whitespace/operators)
-  SGDRegUpdateAllAndClear<<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS, 0, stream>>>
-      (N, reinterpret_cast<half*>(g), w, h, momentum, local_rate,
-          local_decay, reg_type == "L2", clear_grads);
+  SGDRegUpdateAllAndClear<<<CAFFE_GET_BLOCKS(N), CAFFE_CUDA_NUM_THREADS, 0, stream>>> (N,
+      reinterpret_cast<half*>(g), w, h, 
+      momentum, local_rate, local_decay, reg_type == "L2", clear_grads);
   CUDA_POST_KERNEL_CHECK;
   CUDA_CHECK(cudaStreamSynchronize(stream));
 }

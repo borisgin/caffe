@@ -7,9 +7,9 @@ namespace caffe {
 
 
 
-template<typename Dtype>
+template<typename Gtype, typename Wtype, typename Htype>
 void SAG_reg_update_and_clear_gpu(int N,
-    Dtype* g, Dtype* w,  Dtype* h,
+    Gtype* g, Wtype* w,  Htype* h,
     float momentum, float rate, const std::string& reg_type, float decay,
     void *handle, bool clear_grads);
 
@@ -53,17 +53,49 @@ float SAGSolver<Dtype>::ComputeUpdateValue(int param_id, void* handle, float rat
   } else if (Caffe::mode() == Caffe::GPU) {
     const std::string& reg_type = this->param_.regularization_type();
     float decay = SGDSolver<Dtype>::local_decay(param_id);
-    if (this->iter_ <= 1) {
-      caffe_copy<Dtype>(N, param->gpu_diff<Dtype>(), history->mutable_gpu_data());
-      if (reg_type == "L2"){
-        caffe_gpu_axpy<Dtype>(N, Dtype(decay), param->gpu_data<Dtype>(),
-            history->mutable_gpu_data());
-      }
-    }
-    SAG_reg_update_and_clear_gpu<Dtype>(param->count(),
-            param->mutable_gpu_diff<Dtype>(), param->mutable_gpu_data<Dtype>(),
+//    if (this->iter_ <= 1) {
+//      caffe_copy<Dtype>(N, param->gpu_diff<Dtype>(), history->mutable_gpu_data());
+//      if (reg_type == "L2"){
+//        caffe_gpu_axpy<Dtype>(N, Dtype(decay), param->gpu_data<Dtype>(),
+//            history->mutable_gpu_data());
+//      }
+//    }
+    const Type wtype = param->data_type();
+    const Type gtype = param->diff_type();
+
+    if (gtype == tp<float16>()) {
+      SAG_reg_update_and_clear_gpu<float16, Dtype, Dtype>(param->count(),
+          param->mutable_gpu_diff<float16>(),
+          param->mutable_gpu_data<Dtype>(),
+          history->mutable_gpu_data(),
+          momentum, local_rate, reg_type, decay,  handle, clear_grads);
+    } else if (gtype == tp<float>()) {
+      if (wtype == tp<float>()) {
+        SAG_reg_update_and_clear_gpu<float, float, Dtype>(param->count(),
+            param->mutable_gpu_diff<float>(),
+            param->mutable_gpu_data<float>(),
             history->mutable_gpu_data(),
             momentum, local_rate, reg_type, decay, handle, clear_grads);
+      } else {
+        SAG_reg_update_and_clear_gpu<float, Dtype, Dtype>(param->count(),
+            param->mutable_gpu_diff<float>(),
+            param->mutable_gpu_data<Dtype>(),
+            history->mutable_gpu_data(),
+            momentum, local_rate, reg_type, decay, handle, clear_grads);
+      }
+    } else if (gtype == tp<double>()) {
+      SAG_reg_update_and_clear_gpu<double, Dtype, Dtype>(param->count(),
+          param->mutable_gpu_diff<double>(),
+          param->mutable_gpu_data<Dtype>(),
+          history->mutable_gpu_data(),
+          momentum, local_rate, reg_type, decay,  handle, clear_grads);
+    } else {
+      LOG(FATAL) << "Gradient type " << Type_Name(gtype) << " is not supported";
+    }
+
+//  SAG_reg_update_and_clear_gpu<Dtype>(param->count(),
+//     param->mutable_gpu_diff<Dtype>(), param->mutable_gpu_data<Dtype>(),  history->mutable_gpu_data(),
+//     momentum, local_rate, reg_type, decay, handle, clear_grads);
   } else {
     LOG(FATAL) << "Unknown caffe mode: " << Caffe::mode();
   }
