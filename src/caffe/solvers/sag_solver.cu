@@ -269,4 +269,25 @@ template void SAG_reg_update_and_clear_gpu<double, double, double>(int,
     double*, double*, double*,
     float, float, const std::string&, float, void*, bool);
 
+template void SAG_reg_update_and_clear_gpu<float,float16, float16>(int,
+    float*, float16*, float16*,
+    float, float, const std::string&, float, void*, bool);
+template void SAG_reg_update_and_clear_gpu<double,float16, float16>(int,
+    double*, float16*, float16*,
+    float, float, const std::string&, float, void*, bool);
+template void SAG_reg_update_and_clear_gpu<float,float, double>(int,
+    float*, float*, double*,
+    float, float, const std::string&, float, void*, bool);
+template void SAG_reg_update_and_clear_gpu<double,float, float>(int,
+    double*, float*, float*,
+    float, float, const std::string&, float, void*, bool);
+template void SAG_reg_update_and_clear_gpu<float16, double, double>(int,
+    float16*, double*, double*,
+    float, float, const std::string&, float, void*, bool);
+template void SAG_reg_update_and_clear_gpu<float, double, double>(int,
+    float*, double*, double*,
+    float, float, const std::string&, float, void*, bool);
+
+
+
 }  // namespace caffe
