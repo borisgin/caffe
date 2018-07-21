@@ -81,9 +81,12 @@ __global__ void SGDRegUpdateAllAndClear(int N,
   CUDA_KERNEL_LOOP(i, N) {
     Wtype reg = reg_L2 ? w[i] : Wtype((Wtype(0) < w[i]) - (w[i] < Wtype(0)));
     Wtype gr = Wtype(g[i]) + reg * local_decay;
-    h[i] = momentum * h[i] + local_rate * gr;
-    gr = h[i];
-    w[i] -= gr;
+//    h[i] = momentum * h[i] + local_rate * gr;
+//    gr = h[i];
+//    w[i] -= gr;
+    gr += momentum * Wtype(h[i]);
+    h[i] = Htype(gr);
+    w[i] -= Wtype(local_rate * gr);
     if (clear_grads) {
       g[i] = Gtype(0);
     }
@@ -101,8 +104,12 @@ __global__ void SGDRegUpdateAllAndClear<half, half, half>(int N,
     float hf = __half2float(h[i]);
     float reg = reg_L2 ? wf : float((0.F < wf)-(wf < 0.F));
     gf += reg * local_decay;
-    hf = momentum * hf  + local_rate * gf;
-    gf = hf;
+
+//    hf = momentum * hf  + local_rate * gf;
+//    gf = hf;
+    hf = momentum * hf  + gf;
+    gf = local_rate * hf;
+
     wf -= gf;
     h[i] = float2half_clip(hf);
     w[i] = float2half_clip(wf);
@@ -123,7 +130,11 @@ __global__ void SGDRegUpdateAllAndClear<float, float, half>(int N,
     float hf = __half2float(h[i]);
     float reg = reg_L2 ? wf : float((0.F < wf)-(wf < 0.F));
     gf += reg * local_decay;
-    gf = hf = momentum * hf  + local_rate * gf;
+
+//    gf = hf = momentum * hf  + local_rate * gf;
+    hf = momentum * hf  + gf;
+    gf = local_rate * hf;
+
     wf -= gf;
     h[i] = float2half_clip(hf);
     w[i] = wf;
@@ -140,9 +151,15 @@ __global__ void SGDRegUpdateAllAndClear<half, float, float>(int N,
   half hz;
   CUDA_KERNEL_LOOP(i, N) {
     float reg = reg_L2 ? w[i] : (0.F < w[i]) - (w[i] < 0.F);
-    float gr = __half2float(g[i]) + reg * local_decay;
-    gr = h[i] = momentum * h[i] + local_rate * gr;
-    w[i] -= gr;
+    float gf = __half2float(g[i]);
+    gf += reg * local_decay;
+
+//    gf = h[i] = momentum * h[i] + local_rate * gf;
+    float hf = momentum * h[i] + gf;
+    h[i] = hf;
+    gf = local_rate * hf;
+
+    w[i] -= gf;
     if (clear_grads) {
       g[i] = hz;
     }

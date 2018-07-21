@@ -1,12 +1,12 @@
-name: "AlexNet_B16k_fp16"
+name: "AlexNet_B8k"
 
-default_forward_type:  FLOAT16
-default_backward_type: FLOAT16
-default_forward_math:  FLOAT16
-default_backward_math: FLOAT16
+#default_forward_type:  FLOAT16
+#default_backward_type: FLOAT16
+#default_forward_math:  FLOAT16
+#default_backward_math: FLOAT16
 
-global_grad_scale: 1000.
-#global_grad_scale_adaptive: True
+#global_grad_scale: 1000.
+#global_grad_scale_adaptive: true
 
 layer {
   name: "data"
@@ -20,7 +20,7 @@ layer {
   }
   data_param {
     source: "examples/imagenet/ilsvrc12_train_lmdb"
-    batch_size: 16384 #1024  # #16384 8192 #
+    batch_size: 8192 #1024  # #16384  #16384 
     cache: true
     shuffle: true
     backend: LMDB

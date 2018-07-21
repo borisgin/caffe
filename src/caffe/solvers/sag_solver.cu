@@ -94,7 +94,8 @@ __global__ void SAGWdUpdateAllAndClear(int N,
     float gf = float(g[i]);
     float hf = float(h[i]);
     hf = momentum * hf + m1 * gf;
-    wf -= rate * (hf + decay*wf);
+  //  wf -= rate * (hf + decay*wf);
+    wf -= rate * hf + decay * wf;
     w[i] = Wtype(wf);
     h[i] = Htype(hf);
     if (clear_grads) {

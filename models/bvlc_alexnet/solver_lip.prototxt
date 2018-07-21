@@ -1,44 +1,44 @@
 net: "models/bvlc_alexnet/train_val_ls.prototxt"
 
 test_iter: 196             #1562 = 50000/32
-test_interval:  75 #150 #1250 #75 #   
+test_interval:  75         #150 #1250 #75 #   
 test_initialization: false
 
 display:  15 #125 #15 #
 
-max_iter: 8580 # 110 e15600 #125000 # 
-#iter_size: 2
+max_iter: 7800  # 120 8625 # 110 e 15600 #125000 # 
+iter_size: 2
 
-#rampup_interval : 2500
-#rampup_lr :0.04;
-
-base_lr: 3.5  #0.5      
-min_lr:  1.e-5
+base_lr: 5.0      
+min_lr:  1.0e-5
 lr_policy: "poly" #  #"fixed" #
 power: 2
 
 larc: true
 larc_turbo: true
 larc_policy: "clip"
-larc_eta: 0.064   #0.05
+larc_eta: 0.005      #0.05
 
-momentum: 0.9
-max_momentum: 0.96
-momentum_policy: "poly"
-momentum_power: 1
+momentum: 0.9 # 0.95
+#max_momentum: 0.96
+#momentum_policy: "poly"
+#momentum_power: 1
 
-weight_decay: 0.0005 #0.0005
+weight_decay: 0.0005  # wd2 parameters wo 1/(1-m) correction # 0.0005
+#max_weight_decay: 0.01
 #weight_decay_policy: "poly"  
-#weight_decay_power: 1;
+#weight_decay_power: 1
 
-snapshot: 4000
+#type: "SAG"
+#regularization_type: "WD"
+#solver_data_type: FLOAT16
+
+#rampup_interval : 2500
+#rampup_lr: 0.04;
+solver_mode: GPU
+#snapshot: 4000
 snapshot_prefix: "models/bvlc_alexnet/snapshots/alexnet_B16K_4000"
 snapshot_after_train: false
-
-solver_mode: GPU
-#type: "SAG"
-regularization_type: "WD"
-#solver_data_type: FLOAT16
 random_seed: 1
 
 # Train dataset size = 1,281,167
