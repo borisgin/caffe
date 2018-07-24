@@ -13,8 +13,10 @@ __global__ void SGDWdUpdateAllAndClear(int N,
   float wd = local_decay * local_rate;
   CUDA_KERNEL_LOOP(i, N) {
     float wf =  float(w[i]);
-    float hf = momentum * float(h[i]) + local_rate * float(g[i]);
-    wf -= hf + wd * wf;
+//    float hf = momentum * float(h[i]) + local_rate * float(g[i]);
+//    wf -= hf + wd * wf;
+    float hf = momentum * float(h[i]) +  float(g[i]);
+    wf -=  local_rate * (hf + wd * wf);
     h[i] = Htype(hf);
     w[i] = Wtype(wf);
     if (clear_grads) {
@@ -31,8 +33,10 @@ __global__ void SGDWdUpdateAllAndClear<half, half, half>(int N,
   float wd = local_decay * local_rate;
   CUDA_KERNEL_LOOP(i, N) {
     float wf = __half2float(w[i]);
-    float hf = momentum * __half2float(h[i])  + local_rate * __half2float(g[i]);
-    wf -= hf + wd * wf;
+//    float hf = momentum * __half2float(h[i])  + local_rate * __half2float(g[i]);
+//    wf -= hf + wd * wf;
+    float hf = momentum * __half2float(h[i])  +  __half2float(g[i]);
+    wf -= local_rate * (hf + wd * wf);
     h[i] = float2half_clip(hf);
     w[i] = float2half_clip(wf);
     if (clear_grads) {
@@ -48,8 +52,10 @@ __global__ void SGDWdUpdateAllAndClear<float, float, half>(int N,
   float wd = local_decay * local_rate;
   CUDA_KERNEL_LOOP(i, N) {
     float wf = w[i];
-    float hf = momentum * __half2float(h[i]) + local_rate * g[i];
-    w[i] -= hf + wd * wf;
+//    float hf = momentum * __half2float(h[i]) + local_rate * g[i];
+//    w[i] -= hf + wd * wf;
+    float hf = momentum * __half2float(h[i]) +  g[i];
+    w[i] -= local_rate * (hf + wd * wf);
     h[i] = float2half_clip(hf);
     if (clear_grads) {
       g[i] = 0.F;
@@ -64,8 +70,10 @@ __global__ void SGDWdUpdateAllAndClear<float, half, half>(int N,
   float wd = local_decay * local_rate;
   CUDA_KERNEL_LOOP(i, N) {
     float wf = __half2float(w[i]);
-    float hf = momentum * __half2float(h[i]) + local_rate * g[i];
-    wf -= hf + wd * wf;
+//    float hf = momentum * __half2float(h[i]) + local_rate * g[i];
+//    wf -= hf + wd * wf;
+    float hf = momentum * __half2float(h[i]) + g[i];
+    wf -= local_rate * (hf + wd * wf);
     w[i] = float2half_clip(wf);
     h[i] = float2half_clip(hf);
     if (clear_grads) {
