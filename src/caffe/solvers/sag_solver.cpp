@@ -39,7 +39,7 @@ float SAGSolver<Dtype>::ComputeUpdateValue(int param_id, void* handle, float rat
   }
 
   float momentum = this->GetMomentum();
-  float N=param->count();
+  //float N=param->count();
   // Compute the update to history, then copy it to the parameter diff.
 
   if (Caffe::mode() == Caffe::CPU) {
@@ -109,6 +109,8 @@ float SAGSolver<Dtype>::GetLocalRate(int param_id, float& wgrad_sq)  {
 
   if (this->net_->global_grad_scale_enabled() || this->param_.larc()) {
     shared_ptr<Blob> param = this->net_->learnable_params()[param_id];
+    TBlob<Dtype>* hist = this->history_[param_id].get();
+
     const int type_id = this->net_->learnable_types()[0] == param->diff_type() ? 0 : 1;
     wgrad_sq = param->sumsq_diff(type_id);
     if (std::isnan(wgrad_sq)) {
@@ -116,15 +118,18 @@ float SAGSolver<Dtype>::GetLocalRate(int param_id, float& wgrad_sq)  {
 
     }
     if (this->param_.larc()) {
-      const float wgrad_norm = std::sqrt(wgrad_sq);
-      const float w_norm = std::sqrt(param->sumsq_data(type_id));
+      float m_norm=std::sqrt(hist->sumsq_data());
+      float wgrad_norm = std::sqrt(wgrad_sq);
+      float w_norm = std::sqrt(param->sumsq_data(type_id));
       if (std::isnan(wgrad_sq)) {
         LOG(INFO) << "LARC: nan";
       }
       const float larc_eta = this->param_.larc_eta();
       float rate = 1.F;
-      if (w_norm > 0.F && wgrad_norm > 0.F) {
-        rate =  larc_eta * w_norm /wgrad_norm;
+      if (w_norm > 0.F && m_norm > 0.F) {
+        rate =  larc_eta * w_norm /m_norm;
+//      if (w_norm > 0.F && wgrad_norm > 0.F) {
+        //rate =  larc_eta * w_norm /wgrad_norm;
         // float momentum=this->GetMomentum();
         // rate = (1.0 - momentum)* larc_eta * w_norm /wgrad_norm ;
       }
@@ -132,12 +137,11 @@ float SAGSolver<Dtype>::GetLocalRate(int param_id, float& wgrad_sq)  {
         local_lr = rate;
       }
       if (this->param_.larc_turbo())  {
-        TBlob<Dtype>* hist = this->history_[param_id].get();
-        const int N = param->count();
         if (this->iter_ > 1) {
           float g_m_dot;
-          caffe_gpu_dot<Dtype>(N,param->gpu_diff<Dtype>(),  hist->gpu_data(), &g_m_dot);
-          float m_norm=std::sqrt(hist->sumsq_data(type_id));
+          const int N = param->count();
+          caffe_gpu_dot<Dtype>(N, param->gpu_diff<Dtype>(),  hist->gpu_data(), &g_m_dot);
+          //float m_norm=std::sqrt(hist->sumsq_data(type_id));
           float g1_go_corr = 0;
           if ((wgrad_norm > 0.) && (m_norm > 0.)) {
              g1_go_corr = g_m_dot / (wgrad_norm *m_norm);
