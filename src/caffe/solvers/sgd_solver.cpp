@@ -133,9 +133,9 @@ void SGDSolver<Dtype>::PreSolve() {
   }
 
   for (int i = 0; i < net_params.size(); ++i) {
-     TBlob<Dtype>* prev = this->temp_[i].get();
-     prev->set_data(0.);
-     prev->set_diff(0.);
+     TBlob<Dtype>* tmp = this->temp_[i].get();
+     tmp->set_data(0.);
+     tmp->set_diff(0.);
    }
   // booster
   int N=net_params.size();

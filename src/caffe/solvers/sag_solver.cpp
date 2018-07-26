@@ -9,7 +9,7 @@ namespace caffe {
 
 template<typename Gtype, typename Wtype, typename Htype>
 void SAG_reg_update_and_clear_gpu(int N,
-    Gtype* g, Wtype* w,  Htype* h,
+    Gtype* g, Wtype* w,  Htype* h, Htype* t,
     float momentum, float rate, const std::string& reg_type, float decay,
     void *handle, bool clear_grads);
 
@@ -21,6 +21,7 @@ float SAGSolver<Dtype>::ComputeUpdateValue(int param_id, void* handle, float rat
   }
   Blob* param = this->net_->learnable_params()[param_id].get();
   TBlob<Dtype>* history = this->history_[param_id].get();
+  TBlob<Dtype>* temp = this->temp_[param_id].get();
 
   float wgrad_sq = 0.F;
   float local_rate = SAGSolver<Dtype>::GetLocalRate(param_id, wgrad_sq);
@@ -68,6 +69,7 @@ float SAGSolver<Dtype>::ComputeUpdateValue(int param_id, void* handle, float rat
           param->mutable_gpu_diff<float16>(),
           param->mutable_gpu_data<Dtype>(),
           history->mutable_gpu_data(),
+          temp->mutable_gpu_data(),
           momentum, local_rate, reg_type, decay,  handle, clear_grads);
     } else if (gtype == tp<float>()) {
       if (wtype == tp<float>()) {
@@ -75,12 +77,14 @@ float SAGSolver<Dtype>::ComputeUpdateValue(int param_id, void* handle, float rat
             param->mutable_gpu_diff<float>(),
             param->mutable_gpu_data<float>(),
             history->mutable_gpu_data(),
+            temp->mutable_gpu_data(),
             momentum, local_rate, reg_type, decay, handle, clear_grads);
       } else {
         SAG_reg_update_and_clear_gpu<float, Dtype, Dtype>(param->count(),
             param->mutable_gpu_diff<float>(),
             param->mutable_gpu_data<Dtype>(),
             history->mutable_gpu_data(),
+            temp->mutable_gpu_data(),
             momentum, local_rate, reg_type, decay, handle, clear_grads);
       }
     } else if (gtype == tp<double>()) {
@@ -88,14 +92,12 @@ float SAGSolver<Dtype>::ComputeUpdateValue(int param_id, void* handle, float rat
           param->mutable_gpu_diff<double>(),
           param->mutable_gpu_data<Dtype>(),
           history->mutable_gpu_data(),
+          temp->mutable_gpu_data(),
           momentum, local_rate, reg_type, decay,  handle, clear_grads);
     } else {
       LOG(FATAL) << "Gradient type " << Type_Name(gtype) << " is not supported";
     }
 
-//  SAG_reg_update_and_clear_gpu<Dtype>(param->count(),
-//     param->mutable_gpu_diff<Dtype>(), param->mutable_gpu_data<Dtype>(),  history->mutable_gpu_data(),
-//     momentum, local_rate, reg_type, decay, handle, clear_grads);
   } else {
     LOG(FATAL) << "Unknown caffe mode: " << Caffe::mode();
   }
@@ -155,17 +157,18 @@ float SAGSolver<Dtype>::GetLocalRate(int param_id, float& wgrad_sq)  {
       this->local_rates_[param_id] = local_lr;
 
 //#ifdef DEBUG
-          if (Caffe::root_solver() && this->param_.display()
-               && (this->iter_ % this->param_.display() == 0)
-               && (local_lr>0)) {
-             //using namespace std;
-             LOG(INFO) << std::setw(2) << param_id
-                  << " lr="       << std::fixed << std::setprecision(6) << local_lr
-                  << "  g_corr="  << std::fixed << std::setprecision(6) << this->g_corr_[param_id]
-                  << "  w="       << w_norm
-                  << "  g="       << wgrad_norm
-                 ;
-          }
+      if (Caffe::root_solver() && this->param_.display()
+           && (this->iter_ % this->param_.display() == 0)
+           && (local_lr>0)) {
+         //using namespace std;
+         LOG(INFO) << std::setw(2) << param_id
+              << " lr="       << std::fixed << std::setprecision(6) << local_lr
+              << " g_corr="  << std::fixed << std::setprecision(6) << this->g_corr_[param_id]
+              << " w="       << w_norm
+              << " m="       << m_norm
+              << " g="       << wgrad_norm
+             ;
+      }
 //#endif
 
 #ifdef DEBUG
